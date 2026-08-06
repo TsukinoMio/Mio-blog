@@ -5,7 +5,13 @@ import Link from 'next/link';
 import { Loader2, Search, X } from 'lucide-react';
 import Fuse, { type IFuseOptions } from 'fuse.js';
 import { copy } from '@/config/copy';
-import { buildHit, type SearchDoc, type SearchHit } from '@/lib/search';
+import {
+  buildHit,
+  PREVIEW_SNIPPETS_PER_DOC,
+  type SearchDoc,
+  type SearchHit,
+  type SearchSnippet,
+} from '@/lib/search';
 import { cn } from '@/lib/utils';
 
 /* --------------------------------------------------------------------------
@@ -57,6 +63,8 @@ export function SearchBox() {
   const [query, setQuery] = useState('');
   const [docs, setDocs] = useState<SearchDoc[] | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  /** 哪些文章的"其余命中"被展开了。换关键词时清空，否则展开状态会串到新结果上 */
+  const [expandedSlugs, setExpandedSlugs] = useState<ReadonlySet<string>>(new Set());
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +102,21 @@ export function SearchBox() {
   const handleClose = () => {
     setOpen(false);
     setQuery('');
+    setExpandedSlugs(new Set());
+  };
+
+  /** 换关键词就把展开状态清掉：结果整批换了，旧的展开状态没有意义 */
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    setExpandedSlugs(new Set());
+  };
+
+  const toggleExpanded = (slug: string) => {
+    setExpandedSlugs((current) => {
+      const next = new Set(current);
+      if (!next.delete(slug)) next.add(slug);
+      return next;
+    });
   };
 
   /* 展开后自动聚焦输入框 */
@@ -157,7 +180,7 @@ export function SearchBox() {
           ref={inputRef}
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => handleQueryChange(event.target.value)}
           placeholder={copy.search.placeholder}
           aria-label={copy.search.open}
           className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-ink-800 outline-none placeholder:text-ink-400"
@@ -213,52 +236,20 @@ export function SearchBox() {
               <p className="border-b border-white/70 px-4 py-2.5 text-xs text-ink-400">
                 {copy.search.resultCount(hits.length)}
               </p>
-              {/* 结果多的时候这一块自己滚动，不会把面板撑出屏幕 */}
+              {/*
+                只有这一层滚动。一篇文章里命中太多时不再另开一个内层滚动条 ——
+                嵌套滚动在触屏上很难操作，改成把其余命中折叠起来、点一下就地展开
+              */}
               <ul className="max-h-[60vh] overflow-y-auto p-2">
                 {hits.map((hit) => (
-                  <li key={hit.slug} className="mb-1 last:mb-0">
-                    {/* 文章标题一篇只出现一次，下面挂着这篇里命中的每一句 */}
-                    <p className="flex items-center gap-2 px-3 pt-2 pb-1">
-                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-800">
-                        {hit.title}
-                      </span>
-                      <span className="shrink-0 rounded-pill bg-white/80 px-2 py-0.5 text-[10px] text-ink-400">
-                        {copy.search.matchCount(hit.totalMatches)}
-                      </span>
-                    </p>
-
-                    <ul>
-                      {hit.snippets.map((snippet, index) => (
-                        <li key={`${snippet.field}-${snippet.contentIndex ?? 'x'}-${index}`}>
-                          <Link
-                            href={buildResultHref(hit.slug, keyword, snippet.contentIndex)}
-                            onClick={handleClose}
-                            className={cn(
-                              'flex gap-2 rounded-2xl px-3 py-1.5',
-                              'transition-colors duration-300 ease-idol hover:bg-white/80',
-                            )}
-                          >
-                            <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-ink-400/60" />
-                            <span className="min-w-0 flex-1 text-xs leading-relaxed text-ink-500">
-                              <HighlightedSnippet
-                                snippet={snippet.snippet}
-                                highlight={snippet.highlight}
-                              />
-                            </span>
-                            <span className="mt-0.5 shrink-0 text-[10px] text-ink-400">
-                              {copy.search.fieldLabel[snippet.field]}
-                            </span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-
-                    {hit.totalMatches > hit.snippets.length && (
-                      <p className="px-3 pt-0.5 pb-1 text-[10px] text-ink-400">
-                        {copy.search.moreMatches(hit.totalMatches - hit.snippets.length)}
-                      </p>
-                    )}
-                  </li>
+                  <ResultItem
+                    key={hit.slug}
+                    hit={hit}
+                    keyword={keyword}
+                    expanded={expandedSlugs.has(hit.slug)}
+                    onToggle={() => toggleExpanded(hit.slug)}
+                    onNavigate={handleClose}
+                  />
                 ))}
               </ul>
             </>
@@ -266,6 +257,125 @@ export function SearchBox() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 一篇文章的结果块：标题 + 若干处命中。
+ *
+ * 折叠时只显示前 PREVIEW_SNIPPETS_PER_DOC 条，其余收在「还有 N 处结果」后面，
+ * 点一下就地展开。这样既能翻遍所有命中，又不会让一篇长文把结果面板刷屏。
+ */
+function ResultItem({
+  hit,
+  keyword,
+  expanded,
+  onToggle,
+  onNavigate,
+}: {
+  hit: SearchHit;
+  keyword: string;
+  expanded: boolean;
+  onToggle: () => void;
+  onNavigate: () => void;
+}) {
+  const visible = expanded ? hit.snippets : hit.snippets.slice(0, PREVIEW_SNIPPETS_PER_DOC);
+  const collapsedCount = hit.snippets.length - PREVIEW_SNIPPETS_PER_DOC;
+  // 超过单篇上限、确实没整理出来的处数（和"折叠"是两回事）
+  const notListed = hit.totalMatches - hit.snippets.length;
+
+  return (
+    <li className="mb-1 last:mb-0">
+      {/* 文章标题一篇只出现一次，下面挂着这篇里命中的每一句 */}
+      <p className="flex items-center gap-2 px-3 pt-2 pb-1">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-800">
+          {hit.title}
+        </span>
+        <span className="shrink-0 rounded-pill bg-white/80 px-2 py-0.5 text-[10px] text-ink-400">
+          {copy.search.matchCount(hit.totalMatches)}
+        </span>
+      </p>
+
+      <ul>
+        {visible.map((snippet, index) => (
+          <SnippetRow
+            key={`${snippet.field}-${snippet.contentIndex ?? 'x'}-${index}`}
+            slug={hit.slug}
+            keyword={keyword}
+            snippet={snippet}
+            // 小节标题只在与上一条不同时显示：同一节里连着好几处命中时，
+            // 每条都重复一遍标题会很吵
+            showSection={snippet.sectionTitle !== visible[index - 1]?.sectionTitle}
+            onNavigate={onNavigate}
+          />
+        ))}
+      </ul>
+
+      {collapsedCount > 0 && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className={cn(
+            'w-full rounded-2xl px-3 py-1.5 text-left text-[11px] text-sakura-600',
+            'transition-colors duration-300 ease-idol hover:bg-white/80',
+          )}
+        >
+          {expanded ? copy.search.collapseMatches : copy.search.expandMatches(collapsedCount)}
+        </button>
+      )}
+
+      {expanded && notListed > 0 && (
+        <p className="px-3 pt-0.5 pb-1 text-[10px] text-ink-400">
+          {copy.search.moreMatches(notListed)}
+        </p>
+      )}
+    </li>
+  );
+}
+
+/** 一处命中：可选的小节标题 + 句子 */
+function SnippetRow({
+  slug,
+  keyword,
+  snippet,
+  showSection,
+  onNavigate,
+}: {
+  slug: string;
+  keyword: string;
+  snippet: SearchSnippet;
+  showSection: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <li>
+      {showSection && snippet.sectionTitle && (
+        <p className="px-3 pt-1.5 pb-0.5 text-[11px] font-semibold text-ink-700">
+          {snippet.sectionTitle}
+        </p>
+      )}
+
+      <Link
+        href={buildResultHref(slug, keyword, snippet.contentIndex)}
+        onClick={onNavigate}
+        className={cn(
+          'flex gap-2 rounded-2xl px-3 py-1.5',
+          'transition-colors duration-300 ease-idol hover:bg-white/80',
+        )}
+      >
+        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-ink-400/60" />
+        <span className="min-w-0 flex-1 text-xs leading-relaxed text-ink-500">
+          <HighlightedSnippet snippet={snippet.snippet} highlight={snippet.highlight} />
+        </span>
+        {/* 正文命中已经有小节标题指路了，再标一个"正文"是冗余；其余字段才需要标出来源 */}
+        {snippet.field !== 'content' && (
+          <span className="mt-0.5 shrink-0 text-[10px] text-ink-400">
+            {copy.search.fieldLabel[snippet.field]}
+          </span>
+        )}
+      </Link>
+    </li>
   );
 }
 

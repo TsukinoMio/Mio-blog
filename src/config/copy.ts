@@ -53,7 +53,11 @@ export const copy = {
     resultCount: (count: number) => `${count} 篇相关文章`,
     /** 单篇文章里命中了多少处，显示在标题右边 */
     matchCount: (count: number) => `${count} 处`,
-    /** 命中太多没全列出来时的提示，count 是没列出来的处数 */
+    /** 折叠着的其余命中，点一下就地展开。count 是折叠起来的处数 */
+    expandMatches: (count: number) => `在这篇文章里还有 ${count} 处结果`,
+    /** 展开之后收回去 */
+    collapseMatches: '收起',
+    /** 命中多到超过单篇上限、确实没全列出来时的提示，count 是没列出来的处数 */
     moreMatches: (count: number) => `还有 ${count} 处未列出`,
     /** 结果条目上标注命中位置的小标签 */
     fieldLabel: {

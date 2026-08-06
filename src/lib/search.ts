@@ -12,6 +12,14 @@
    3. 命中之后用 buildHit 把结果整理成"文章标题 + 命中所在的那句话"。
    ========================================================================== */
 
+/** 正文里的一个小节（对应一个 Markdown 标题） */
+export interface SearchSection {
+  /** 小节标题的纯文本 */
+  title: string;
+  /** 这一节从 content 的第几个字符开始 */
+  start: number;
+}
+
 /** 索引里每篇文章的形状 */
 export interface SearchDoc {
   slug: string;
@@ -21,6 +29,15 @@ export interface SearchDoc {
   tags: string[];
   /** 正文纯文本，已去掉 Markdown 语法、代码块和公式 */
   content: string;
+  /**
+   * 正文的小节划分，按 start 升序。
+   *
+   * 只是给每处命中标注"它在哪一节"用的附加信息 —— **content 本身一个字符都没动**。
+   * 这一点很重要：搜索结果跳转靠 ?i=（正文里的第几处命中）定位，
+   * 文章页的 SearchHighlighter 按同样口径数 DOM 里的命中。
+   * 一旦为了分节去改 content，两边的序号立刻错位，跳转就跳错地方了。
+   */
+  sections: SearchSection[];
 }
 
 /** 一处命中：文章里具体某一句 */
@@ -31,6 +48,11 @@ export interface SearchSnippet {
   highlight: [number, number] | null;
   /** 命中在哪个字段上，用来在结果里标一下来源 */
   field: SearchField;
+  /**
+   * 这处命中落在正文的哪一节里，用来在结果面板上显示小节标题。
+   * 命中在标题/摘要/标签这些字段上、或者文章根本没写标题时为 null。
+   */
+  sectionTitle: string | null;
   /**
    * 这是正文里的第几处命中（从 0 开始）。
    * 点结果跳转时带上它，文章页就能滚到对应的那一句去。
@@ -174,11 +196,110 @@ export function extractSentence(
   return { snippet: trimmed.trimEnd(), highlight };
 }
 
+/* --------------------------------------------------------------------------
+   小节划分
+   --------------------------------------------------------------------------
+   做法：在原文每个标题行的 # 号后面插一个不可见记号，让它跟着正文一起过一遍
+   markdownToPlainText，再从结果里找出记号的位置。
+   这样拿到的偏移量天然就是最终 content 里的真实下标 ——
+   既不用把清洗逻辑照抄一遍，也不会因为两套实现有细微差异而对不上。
+   -------------------------------------------------------------------------- */
+
+const SECTION_MARK = '\u0000';
+
+/** 给原文里的标题行打记号。代码围栏内部的 # 是注释，不能算标题 */
+function markHeadingLines(source: string): string {
+  let fence: string | null = null;
+
+  return source
+    .split('\n')
+    .map((line) => {
+      const fenceToken = /^ {0,3}(```|~~~)/.exec(line)?.[1];
+      if (fenceToken) {
+        if (fence === null) fence = fenceToken;
+        else if (fence === fenceToken) fence = null;
+        return line;
+      }
+      if (fence !== null) return line;
+
+      // 记号打在【行尾】。
+      // 千万不要插在行首或井号之后：markdownToPlainText 里有好几条 ^ 锚定的规则
+      // （剥离井号、有序列表的 "1. "、无序列表的 "- " 等），行首一旦被记号占住，
+      // 这些规则就匹配不上，正文会跟改动前对不上。
+      // 实测踩过：### 1. 标题 会因此残留成 "1. 标题" 而不是 "标题"。
+      const isHeading = /^\s{0,3}#{1,6}\s+/.test(line);
+      return isHeading ? `${line}${SECTION_MARK}` : line;
+    })
+    .join('\n');
+}
+
+/** 把记号摘掉，同时记下每个小节的起始位置和标题 */
+function splitSections(marked: string): { content: string; sections: SearchSection[] } {
+  const sections: SearchSection[] = [];
+  let content = '';
+  let cursor = 0;
+
+  let at = marked.indexOf(SECTION_MARK);
+  while (at !== -1) {
+    content += marked.slice(cursor, at);
+    cursor = at + SECTION_MARK.length;
+
+    // 记号打在标题行末尾，所以这一行的行首就是这一节的起点，
+    // 行首到记号之间的文字就是清洗后的标题
+    const lineStart = content.lastIndexOf('\n') + 1;
+    const title = content.slice(lineStart).trim();
+    if (title) sections.push({ title, start: lineStart });
+
+    at = marked.indexOf(SECTION_MARK, cursor);
+  }
+
+  content += marked.slice(cursor);
+  return { content, sections };
+}
+
+/**
+ * 生成索引用的正文：纯文本 + 小节划分。
+ * 给 /search-index.json 路由用；产出的 content 与直接调用 markdownToPlainText 完全一致。
+ */
+export function buildSearchContent(source: string): {
+  content: string;
+  sections: SearchSection[];
+} {
+  // 原文里真出现 NUL 的概率极低，但先清掉更保险，免得被误认成记号
+  const clean = source.split(SECTION_MARK).join('');
+  return splitSections(markdownToPlainText(markHeadingLines(clean)));
+}
+
+/** 某个位置落在哪一节里。sections 已按 start 升序，顺着找最后一个不超过它的即可 */
+export function findSectionTitle(
+  sections: readonly SearchSection[],
+  position: number,
+): string | null {
+  let title: string | null = null;
+  for (const section of sections) {
+    if (section.start > position) break;
+    title = section.title;
+  }
+  return title;
+}
+
 /** 字段的展示优先级：正文里的句子信息量最大，标题次之 */
 const FIELD_PRIORITY: SearchField[] = ['content', 'summary', 'title', 'tags', 'category'];
 
-/** 一篇文章最多列出多少处命中，再多就只在角标上报个总数，免得结果面板被一篇文章刷屏 */
-export const MAX_SNIPPETS_PER_DOC = 6;
+/**
+ * 折叠状态下每篇文章先显示几条命中。
+ * 其余的收在「还有 N 处」后面，点一下就地展开。
+ */
+export const PREVIEW_SNIPPETS_PER_DOC = 1;
+
+/**
+ * 一篇文章最多整理出多少处命中。
+ *
+ * 不封顶的话，"的""一个"这类高频词在长文里能命中上百处
+ * （用线上索引实测：「的」在 PBR 那篇正文里有 132 处），
+ * 一次搜索会甩出几百个 DOM 节点。超出的部分只在角标上报总数。
+ */
+export const MAX_SNIPPETS_PER_DOC = 50;
 
 /** 找出关键词在文本里出现的所有位置（不区分大小写） */
 export function findOccurrences(haystack: string, needle: string): number[] {
@@ -224,8 +345,11 @@ export function buildHit(
       first,
       first + keyword.length - 1,
     );
-    fieldSnippets.push({ snippet, highlight, field, contentIndex: null });
+    fieldSnippets.push({ snippet, highlight, field, sectionTitle: null, contentIndex: null });
   }
+
+  // 索引可能来自旧版本（那时还没有 sections 字段），兜一下底
+  const sections = doc.sections ?? [];
 
   // 正文里出现几次就出几条
   const contentPositions = findOccurrences(doc.content, keyword);
@@ -235,7 +359,15 @@ export function buildHit(
       position,
       position + keyword.length - 1,
     );
-    return { snippet, highlight, field: 'content' as const, contentIndex: index };
+    return {
+      snippet,
+      highlight,
+      field: 'content' as const,
+      sectionTitle: findSectionTitle(sections, position),
+      // 注意用的是 index（正文里的第几处），不是按小节重新编号 ——
+      // 文章页靠这个序号定位，重编号会跳错地方
+      contentIndex: index,
+    };
   });
 
   const totalMatches = fieldSnippets.length + contentSnippets.length;
@@ -263,7 +395,9 @@ export function buildHit(
     return {
       slug: doc.slug,
       title: doc.title,
-      snippets: [{ snippet: doc.summary, highlight: null, field, contentIndex: null }],
+      snippets: [
+        { snippet: doc.summary, highlight: null, field, sectionTitle: null, contentIndex: null },
+      ],
       totalMatches: 1,
     };
   }
@@ -278,6 +412,8 @@ export function buildHit(
         snippet: snippet || doc.summary,
         highlight: snippet ? highlight : null,
         field,
+        // 模糊命中拿不到正文里的确切位置，也就无从判断属于哪一节
+        sectionTitle: null,
         contentIndex: null,
       },
     ],

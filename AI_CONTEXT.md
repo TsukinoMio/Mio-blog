@@ -334,7 +334,12 @@ Container(narrow) > GlassCard > MDXContent
 
 **匹配**：Fuse.js，字段权重 title(3) > summary(2) = tags(2) > category(1.5) > content(1)，`ignoreLocation: true`、`threshold: 0.35`、`minMatchCharLength: 2`。
 
-**结果**：按文章分组，标题右边标「N 处」，下面列出每一处命中的句子（一篇最多 6 条，`MAX_SNIPPETS_PER_DOC`）。点击跳到 `?q=&i=`，文章页滚到那一句。
+**结果**：按文章分组，标题右边标「N 处」，下面按**正文小节**分组列出命中的句子（小节标题只在与上一条不同时显示）。默认只展开 `PREVIEW_SNIPPETS_PER_DOC = 1` 条，其余收在「在这篇文章里还有 N 处结果」后面点击就地展开；单篇硬上限 `MAX_SNIPPETS_PER_DOC = 50`。点击跳到 `?q=&i=`，文章页滚到那一句。
+
+**只有一个滚动条**（结果面板整体）。刻意不做嵌套滚动：触屏上内外两层滚动很难操作。
+
+**小节划分怎么来的**（`buildSearchContent`）：在原文标题行**末尾**打一个 ` ` 记号，跟正文一起过一遍 `markdownToPlainText`，再从结果里找记号位置。这样偏移量天然是 `content` 里的真实下标，不用把清洗逻辑抄第二遍。
+**记号必须打在行尾**——打在行首或井号后面会挡住 `markdownToPlainText` 里那些 `^` 锚定的规则（剥井号、剥有序列表 `1. ` 等），导致 `content` 与改动前对不上。实测踩过：`### 1. 标题` 会残留成 `1. 标题`。
 
 **关键对齐机制**：为了让"第 i 处"在索引和 DOM 里指同一处，**两边都跳过代码块和公式** —— 索引侧在 `markdownToPlainText` 剔除，页面侧跳过 `pre` 和 `.katex`。行内公式也是整段剔除（不是只去 `$`），因为 KaTeX 渲染后的 DOM 文字对不上。**改动任一侧时必须同步改另一侧**。
 

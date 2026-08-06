@@ -1,5 +1,5 @@
 import { getAllPosts, getPost } from '@/lib/posts';
-import { markdownToPlainText, type SearchDoc } from '@/lib/search';
+import { buildSearchContent, type SearchDoc } from '@/lib/search';
 
 /**
  * 搜索索引：/search-index.json
@@ -20,13 +20,18 @@ export async function GET() {
     const post = await getPost(meta.slug);
     if (!post) continue;
 
+    // content 与直接调用 markdownToPlainText 完全一致；
+    // sections 只是附加的小节划分，用来在搜索结果里标出命中所在的小节
+    const { content, sections } = buildSearchContent(post.content);
+
     docs.push({
       slug: post.slug,
       title: post.title,
       summary: post.summary,
       category: post.category,
       tags: post.tags,
-      content: markdownToPlainText(post.content),
+      content,
+      sections,
     });
   }
 
