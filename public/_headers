@@ -1,0 +1,23 @@
+# Cloudflare Workers Assets 的响应头配置。
+# 这个文件会被原样带进 .open-next/assets，由 Workers Assets 读取。
+#
+# 【为什么需要它】
+# Workers Assets 对非哈希命名的文件默认发 `Cache-Control: public, max-age=0,
+# must-revalidate`，也就是浏览器每次都要回源确认。对 public/audio/ 下那几个
+# 10~13 MB 的音频来说，这意味着每次进站都重新下载一遍，实测慢到无法接受。
+#
+# 规则从上往下匹配，第一条命中的生效。
+
+# 构建产物，文件名带内容哈希，内容变了文件名一定跟着变 —— 可以放心永久缓存
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 音频。文件名固定不带哈希，所以不能用 immutable：
+# 万一哪天用同名文件换了首歌，immutable 会让浏览器在缓存过期前根本不来问。
+# 30 天 + 回源校验（ETag 命中就是 304，只花一个往返，不重传十几 MB）。
+/audio/*
+  Cache-Control: public, max-age=2592000, must-revalidate
+
+# 专辑封面、头像、背景图、文章配图。同样不带哈希，同样给 30 天 + 回源校验。
+/images/*
+  Cache-Control: public, max-age=2592000, must-revalidate

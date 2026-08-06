@@ -74,6 +74,15 @@ export function PlayerProvider({
   const rotationAccRef = useRef(0);
   /** 当前这一段是从什么时候开始转的；null 表示此刻没在转 */
   const rotationSinceRef = useRef<number | null>(null);
+  /**
+   * 我们"希望"处于播放状态。
+   *
+   * 音频托管在 Workers Assets 上，实测不支持 Range 请求、单曲 10~13 MB，
+   * 慢网络下 play() 很可能在数据到位前就失败（AbortError，或被 load() 打断）。
+   * 光靠"调了 play() 就当播了"会出现「加载完却停在暂停态、必须手点」。
+   * 有了这个意图标记，就能在 canplay（数据够播了）时补一次。
+   */
+  const wantsPlayRef = useRef(false);
 
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -88,6 +97,37 @@ export function PlayerProvider({
 
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null;
 
+  /**
+   * 全站统一的"开始播放"入口。
+   *
+   * 除了调用 play()，还会记下播放意图（wantsPlayRef），这样即使这一次因为
+   * 数据没到位而失败，也能在 canplay 时补播。返回值表示这次是否真的播起来了。
+   */
+  const attemptPlay = useCallback(async () => {
+    const audio = audioRef.current;
+    if (!audio) return false;
+
+    wantsPlayRef.current = true;
+    try {
+      await audio.play();
+      return true;
+    } catch (error: unknown) {
+      // NotAllowedError = 浏览器的自动播放策略拦下来了（用户还没跟页面交互过），
+      // 交给下面的手势解锁逻辑处理。
+      // 其余错误（AbortError、数据还没到位等）保留播放意图，等 canplay 补一次。
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        setAutoplayBlocked(true);
+      }
+      return false;
+    }
+  }, []);
+
+  /** 统一的"暂停"入口。必须清掉播放意图，否则 canplay 会把它又拉起来 */
+  const pauseAudio = useCallback(() => {
+    wantsPlayRef.current = false;
+    audioRef.current?.pause();
+  }, []);
+
   /* 选中的歌变化时，换源并按需播放 */
   useEffect(() => {
     const audio = audioRef.current;
@@ -99,16 +139,8 @@ export function PlayerProvider({
     audio.src = resolveAudioSrc(track.src);
     audio.load();
 
-    if (autoPlayRef.current) {
-      void audio.play().catch((error: unknown) => {
-        // NotAllowedError = 浏览器的自动播放策略拦下来了（用户还没跟页面交互过）。
-        // 记下来，等用户第一次点/按键时再接上；其他错误（比如音频 404）忽略即可。
-        if (error instanceof DOMException && error.name === 'NotAllowedError') {
-          setAutoplayBlocked(true);
-        }
-      });
-    }
-  }, [currentIndex, tracks]);
+    if (autoPlayRef.current) void attemptPlay();
+  }, [currentIndex, tracks, attemptPlay]);
 
   /* 进入页面时自动开一首 */
   useEffect(() => {
@@ -135,21 +167,36 @@ export function PlayerProvider({
 
     const events = ['pointerdown', 'keydown', 'touchstart'] as const;
 
-    const handleFirstGesture = (event: Event) => {
+    // 用函数声明而不是 const 箭头函数：两者互相引用，函数声明会提升，不会踩 TDZ
+    function detach() {
       events.forEach((name) => document.removeEventListener(name, handleFirstGesture));
-      setAutoplayBlocked(false);
+    }
 
+    function handleFirstGesture(event: Event) {
       // 如果这第一次交互正好是在点播放器自己的按钮，就交给按钮去处理 ——
       // 否则这里先播、按钮的 click 再切一次，结果反而变成暂停
       const target = event.target;
-      if (target instanceof Element && target.closest('[data-player-ui]')) return;
+      if (target instanceof Element && target.closest('[data-player-ui]')) {
+        detach();
+        setAutoplayBlocked(false);
+        return;
+      }
 
-      void audioRef.current?.play().catch(() => undefined);
-    };
+      // 【关键】只有真的播起来了才注销监听。
+      // 旧实现在这里无条件注销 + 吞掉 play() 的失败，慢网络下第一次没成功
+      // 就再也不会自动接上了 —— 表现为"加载完却停在暂停态，只能手点播放"。
+      // 现在失败就保留监听，等用户下一次交互再试；同时 attemptPlay 记下了
+      // 播放意图，数据到位时 canplay 那边也会补一次。
+      void attemptPlay().then((started) => {
+        if (!started) return;
+        detach();
+        setAutoplayBlocked(false);
+      });
+    }
 
     events.forEach((name) => document.addEventListener(name, handleFirstGesture));
-    return () => events.forEach((name) => document.removeEventListener(name, handleFirstGesture));
-  }, [autoplayBlocked]);
+    return detach;
+  }, [autoplayBlocked, attemptPlay]);
 
   /* 音量 / 静音同步到 audio 元素 */
   useEffect(() => {
@@ -165,14 +212,14 @@ export function PlayerProvider({
       if (index === currentIndex) {
         const audio = audioRef.current;
         if (!audio) return;
-        if (audio.paused) void audio.play().catch(() => undefined);
-        else audio.pause();
+        if (audio.paused) void attemptPlay();
+        else pauseAudio();
         return;
       }
 
       setCurrentIndex(index);
     },
-    [currentIndex, tracks.length],
+    [currentIndex, tracks.length, attemptPlay, pauseAudio],
   );
 
   const togglePlay = useCallback(() => {
@@ -182,9 +229,9 @@ export function PlayerProvider({
     }
     const audio = audioRef.current;
     if (!audio) return;
-    if (audio.paused) void audio.play().catch(() => undefined);
-    else audio.pause();
-  }, [currentIndex, playTrack]);
+    if (audio.paused) void attemptPlay();
+    else pauseAudio();
+  }, [currentIndex, playTrack, attemptPlay, pauseAudio]);
 
   const playNext = useCallback(() => {
     if (tracks.length === 0) return;
@@ -211,18 +258,20 @@ export function PlayerProvider({
 
     if (repeat === 'one') {
       audio.currentTime = 0;
-      void audio.play().catch(() => undefined);
+      void attemptPlay();
       return;
     }
 
     const isLast = currentIndex >= tracks.length - 1;
     if (repeat === 'off' && isLast) {
+      // 自然播完且不再续播，清掉播放意图，免得 canplay 又把它拉起来
+      wantsPlayRef.current = false;
       setIsPlaying(false);
       return;
     }
 
     playNext();
-  }, [repeat, currentIndex, tracks.length, playNext]);
+  }, [repeat, currentIndex, tracks.length, playNext, attemptPlay]);
 
   /* 绑定 audio 事件 */
   useEffect(() => {
@@ -247,8 +296,20 @@ export function PlayerProvider({
       }
     };
 
+    /**
+     * 慢网络补播：数据够播了，但我们本来想播、现在却停着，就补一次。
+     *
+     * 这是"加载完却不播"的第二道保险 —— 第一道是手势解锁失败后保留监听。
+     * 这里直接用 audio.play() 而不是 attemptPlay()：意图已经是 true 了，
+     * 不需要再设一遍；失败也没关系，下一次 canplay 还会再来。
+     */
+    const onCanPlay = () => {
+      if (wantsPlayRef.current && audio.paused) void audio.play().catch(() => undefined);
+    };
+
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('canplay', onCanPlay);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('ended', handleEnded);
@@ -256,6 +317,7 @@ export function PlayerProvider({
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('canplay', onCanPlay);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', handleEnded);
