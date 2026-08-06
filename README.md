@@ -147,13 +147,17 @@ effects: { starfield: false, glowOrbs: false }
 
 ### 换浏览器标签页图标（favicon）
 
-图片放进 `public/`（比如 `public/images/my-icon.png`），把 `site.ts` 的 `icon` 改成对应路径即可，svg / png / ico 都支持：
+图片放进 **`public/images/`**，把 `site.ts` 的 `icon` 改成对应路径即可，svg / png / ico 都支持：
 
 ```ts
 icon: '/images/my-icon.png',
 ```
 
-**注意别把图标放回 `src/app/icon.svg`** —— 那是 Next.js 的文件约定，只要那个文件存在就会自动接管并覆盖 `site.ts` 的配置。默认图标现在放在 `public/icon.svg`。
+**放 `public/images/` 而不是 `public/` 根目录**：`public/_headers` 给 `/images/*` 配了 30 天缓存，放根目录那条通配盖不到，图标每次导航都要回源校验一次。
+
+**别把图标放回 `src/app/icon.*`** —— 那是 Next.js 的文件约定，只要那个文件存在就会自动接管并覆盖 `site.ts` 的配置。项目自带的默认图标在 `public/images/icon.svg`。
+
+图标建议做成**正方形**（512×512 或 180×180）：浏览器会把它塞进方形槽位，非正方形的图会被拉伸变形。
 
 另外标签页标题里名字后面的 `·` 来自 `tagline`：`tagline` 留空就只显示站名，不会留下孤零零的分隔点。
 

@@ -121,7 +121,9 @@ personalWeb/
     │   ├── blog/page.tsx     ← 列表页
     │   ├── blog/[slug]/page.tsx  ← 详情页（SSG）
     │   ├── search-index.json/route.ts ← 构建期生成静态搜索索引
-    │   ├── sitemap.ts / robots.ts / not-found.tsx / icon.svg
+    │   ├── sitemap.ts / robots.ts / not-found.tsx
+    │   │   （favicon 不在这里 —— 走 siteConfig.icon 配置，图放 public/images/。
+    │   │     放回 src/app/icon.* 会被 Next 文件约定接管，让配置失效）
     ├── components/
     │   ├── ui/          Container · GlassCard · Badge（视觉基元）
     │   ├── layout/      Header · Footer · SearchBox

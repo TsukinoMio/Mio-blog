@@ -27,13 +27,17 @@ export const siteConfig = {
   /**
    * 浏览器标签页左边的小图标（favicon）。
    *
-   * 换图标：把新图片放进 public/（比如 public/images/my-icon.png），
-   * 再把这里改成对应路径即可，svg / png / ico 都行，不用改代码。
+   * 换图标：把新图片放进 **public/images/**，再把这里改成对应路径即可，
+   * svg / png / ico 都行，不用改代码。
    *
-   * 注意：**不要**把图标放回 src/app/icon.svg —— 那是 Next.js 的文件约定，
+   * 为什么强调放 images/ 而不是 public/ 根目录：public/_headers 里给
+   * /images/* 配了 30 天缓存，放根目录的话那条通配盖不到，图标每次导航
+   * 都要回源校验一次，还得为它单列一条缓存规则。
+   *
+   * 注意：**不要**把图标放回 src/app/icon.*  —— 那是 Next.js 的文件约定，
    * 一旦那个文件存在就会自动接管、覆盖这里的配置，等于这个字段失效。
    */
-  icon: '/my-icon.png',
+  icon: '/images/my-icon.png',
   /** 作者名（用于 SEO 与版权信息） */
   author: 'ReikaAkane',
   /** 一句话自我定位，显示在关于页头像旁边 */
