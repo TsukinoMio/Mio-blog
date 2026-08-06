@@ -1,10 +1,11 @@
+import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
 import { MDXRemote } from 'next-mdx-remote/rsc';
 import rehypeKatex from 'rehype-katex';
-import rehypePrettyCode, { type Options as PrettyCodeOptions } from 'rehype-pretty-code';
 import rehypeSlug from 'rehype-slug';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { mdxComponents } from '@/lib/mdx-components';
+import { codeTitleTransformer, getSlimHighlighter, parseCodeMeta, SHIKI_THEME } from '@/lib/shiki';
 import 'katex/dist/katex.min.css';
 
 /**
@@ -18,14 +19,10 @@ import 'katex/dist/katex.min.css';
  *   remarkMath   识别 $行内公式$ 和 $$块级公式$$
  *   rehypeSlug   给标题生成 id，供目录锚点跳转
  *   rehypeKatex  把 remarkMath 标记出的公式渲染成排好版的数学符号
- *   rehypePrettyCode  代码块构建期高亮（Shiki），浏览器零运行时开销
+ *   rehypeShiki  代码块构建期高亮，浏览器零运行时开销。
+ *                用的是 lib/shiki.ts 里的精简实例（只含本站用到的语法和主题），
+ *                原因见那个文件的注释 —— 完整包会撑爆 Workers 的体积上限。
  */
-
-const prettyCodeOptions: PrettyCodeOptions = {
-  theme: 'material-theme-palenight',
-  // 背景交给 globals.css 控制，保持与站点配色一致
-  keepBackground: false,
-};
 
 export function MDXContent({ source }: { source: string }) {
   return (
@@ -36,7 +33,21 @@ export function MDXContent({ source }: { source: string }) {
         options={{
           mdxOptions: {
             remarkPlugins: [remarkGfm, remarkMath],
-            rehypePlugins: [rehypeSlug, rehypeKatex, [rehypePrettyCode, prettyCodeOptions]],
+            rehypePlugins: [
+              rehypeSlug,
+              rehypeKatex,
+              [
+                rehypeShikiFromHighlighter,
+                getSlimHighlighter(),
+                {
+                  theme: SHIKI_THEME,
+                  // 白名单外的语言退化成纯文本，而不是让整个构建失败
+                  fallbackLanguage: 'plaintext',
+                  parseMetaString: parseCodeMeta,
+                  transformers: [codeTitleTransformer],
+                },
+              ],
+            ],
           },
         }}
       />
