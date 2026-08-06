@@ -1,12 +1,14 @@
 # AI 开发上下文文档 — ReikaAkane 个人网站
 
 > 本文档面向 AI 助手，用于在新对话中快速接手本项目。
-> **生成时间**：2026-08-06，基于代码库实际状态扫描生成（非聊天记忆）。
+> **最后更新**：2026-08-06（上线当天），基于代码库实际状态扫描 + 线上实测生成。
 > **项目路径**：`C:\Users\Hikami\Desktop\personalWeb`
-> **校验状态**：`npm run typecheck` ✅ 通过、`npm run lint` ✅ 通过、`npm run build` ✅ 通过
+> **仓库**：`https://github.com/TsukinoMio/Mio-blog`，只用 `main` 一个分支
+> **线上**：`https://blog.reikaakane.com`（Cloudflare Workers，push 到 main 自动部署）
+> **校验状态**：`npm run typecheck` ✅、`npm run lint` ✅、`npm run build` ✅、线上全站实测 ✅
 >
-> **文档分工**：本文件给 AI 看；`README.md` 是操作手册（怎么写文章/换背景/换音乐）；
-> `MioSrc/配置系统说明.md` 是速查表（改 XX 去哪个文件）。三者内容不重复。
+> **文档分工**（四份，内容不重复）：本文件给 AI 看；`README.md` 是操作手册（怎么写文章/换背景/换音乐）；
+> `更新与发布.md` 是发布流程与故障排查；`MioSrc/配置系统说明.md` 是速查表（改 XX 去哪个文件）。
 
 ---
 
@@ -36,17 +38,27 @@
 | 随机背景图 | ✅ |
 | SEO（metadata / sitemap / robots / JSON-LD） | ✅ |
 | 文案全量可配置（`src/config/copy.ts`） | ✅ |
+| **git + GitHub**（`TsukinoMio/Mio-blog`，单 `main` 分支） | ✅ |
+| **Cloudflare Workers 部署**（push 到 main 自动构建上线） | ✅ |
+| **自定义域名 `blog.reikaakane.com`** | ✅ |
 
 ### 未完成内容
 
-- **未初始化 git**（`git status` 报 "not a git repository"）。站主明确说过"先不用 git 到 GitHub"，
-  但**本地仓库仍然值得有** —— 现在改坏任何文件都无法回滚，这也是不要随意删文件的原因。
-- **未部署**。域名通过环境变量 `NEXT_PUBLIC_SITE_URL` 配置（见 `.env.example`），
-  没设时退回 `http://localhost:3000`。
 - **社交链接只有 B 站是真的**。X / GitHub / Email 三条已在 `site.ts` 里注释掉并留了模板，
   拿到真实地址取消注释即可。
 - 只有 4 篇文章，其中 3 篇（hello-world / rsc-notes / stage-lights）是 AI 写的示例内容，
-  只有 PBR 那篇是站主的真实笔记。**没有 git，删文件不可恢复，要删请先确认。**
+  只有 PBR 那篇是站主的真实笔记。**要删站主的内容（文章/图片/配置）之前必须先问。**
+- `MioSrc/BugReport/` 下有两份历史构建失败日志，处于**未跟踪**状态，站主未决定是否入库。别擅自处理。
+
+### 部署速查（详见 `更新与发布.md`）
+
+| 项 | 值 |
+|---|---|
+| Cloudflare 项目名 | `mio-blog`（必须与 `wrangler.jsonc` 的 `name` 一致） |
+| 构建命令 | **`npm run cf:build`** —— 改成 `npm run build` 必然失败 |
+| 部署命令 | `npx wrangler deploy` |
+| 构建变量 | `NEXT_PUBLIC_SITE_URL` = `https://blog.reikaakane.com` |
+| Worker 绑定 | 只有 `ASSETS` 和 `IMAGES` |
 
 ---
 
@@ -63,14 +75,18 @@
 | 内容存储 | **MDX 文件**（`content/blog/*.mdx`）+ 本地 JSON（`src/data/`） | — |
 | MDX 渲染 | next-mdx-remote（`/rsc` 入口） | ^6.0.0 |
 | 数学公式 | remark-math + rehype-katex + katex | 6 / 7 / 0.18 |
-| 代码高亮 | rehype-pretty-code + shiki（构建期，零运行时） | 0.14 / 4.4 |
+| 代码高亮 | **@shikijs/rehype/core + 自建精简 highlighter**（构建期，零运行时） | 4.4 |
 | 锚点 id | rehype-slug + github-slugger | 6 / 2 |
 | frontmatter 校验 | **zod** | ^4.4.3 |
 | 搜索 | **Fuse.js** | ^7.5.0 |
 | 类名工具 | clsx + tailwind-merge（封装成 `cn()`） | — |
-| 部署 | **标准 Next.js 运行时**（刻意不用 `output: 'export'`） | — |
+| 部署 | **Cloudflare Workers**，经 `@opennextjs/cloudflare` 适配 | 1.20 |
+| 部署 CLI | wrangler | 4.119 |
+| 运行时 | **标准 Next.js 运行时**（刻意不用 `output: 'export'`） | — |
 
 **dev 依赖里的 `music-metadata`** 只被 `scripts/extract-audio-covers.mjs` 使用（从 mp3 的 ID3 标签里提取专辑封面），不参与构建。
+
+**`@shikijs/langs` / `@shikijs/themes` 是显式 `dependencies`**，不要以为它们是 shiki 的传递依赖就删掉 —— `src/lib/shiki.ts` 直接 import 它们的子路径。
 
 ---
 
@@ -80,6 +96,9 @@
 personalWeb/
 ├── AI_CONTEXT.md            ← 本文档（给 AI）
 ├── README.md                ← 操作手册（写文章/换背景/换音乐/各功能原理）
+├── 更新与发布.md             ← 发布流程、部署配置、故障排查
+├── wrangler.jsonc           ← 【别删】Cloudflare Worker 配置，见 ADR-6
+├── open-next.config.ts      ← 【别删】OpenNext 适配配置，见 ADR-8
 ├── .env.example             ← 环境变量模板（域名、音频 CDN，都非必填）
 ├── MioSrc/                  ← 站主的素材暂存区，不参与构建
 │   ├── 配置系统说明.md       ← 速查表：改 XX 去哪个文件（不含操作步骤，那些在 README）
@@ -114,7 +133,7 @@ personalWeb/
     │   └── about/       SocialLinks · SocialIcons
     ├── config/          【高频修改】site.ts · theme.ts · copy.ts
     ├── data/            【高频修改】music.json · profile.json
-    ├── lib/             posts.ts · search.ts · toc.ts · music.ts · profile.ts · schema.ts · utils.ts · mdx-components.tsx
+    ├── lib/             posts.ts · search.ts · toc.ts · music.ts · profile.ts · schema.ts · utils.ts · mdx-components.tsx · shiki.ts
     ├── hooks/           useDiscSpin.ts · useMediaQuery.ts
     └── providers/       PlayerProvider.tsx · ThemeProvider.tsx
 ```
@@ -130,6 +149,9 @@ personalWeb/
 | `src/app/globals.css` | 设计 token（`@theme`）+ `--accent-*` 运行时变量 + `.mdx-body` 排版 | 改视觉基调看这里 |
 | `src/lib/search.ts` | 搜索纯逻辑（无 fs / 无 Fuse 依赖），服务端客户端共用 | |
 | `src/lib/toc.ts` | 从 MDX 抽标题生成目录，id 用 github-slugger 与 rehype-slug 对齐 | |
+| `src/lib/shiki.ts` | **代码语言白名单**（当前 `glsl`/`tsx`/`bash`）+ 复刻输出结构的 transformer | 见 ADR-7 |
+| `wrangler.jsonc` | Worker 名字（`mio-blog`）、入口、`ASSETS`/`IMAGES` 绑定 | 见 ADR-6 |
+| `open-next.config.ts` | `incrementalCache` —— **预渲染页面靠它才能被读到** | 见 ADR-8 |
 
 ### 经常修改的文件
 
@@ -253,7 +275,9 @@ Container(narrow) > GlassCard > MDXContent
 ```
 
 **MDX 管线**（`MDXContent.tsx`）：
-`remarkGfm` → `remarkMath` → `rehypeSlug` → `rehypeKatex` → `rehypePrettyCode`
+`remarkGfm` → `remarkMath` → `rehypeSlug` → `rehypeKatex` → `rehypeShikiFromHighlighter`（用 `lib/shiki.ts` 的精简实例，见 ADR-7）
+
+**页面顶部有 `export const dynamicParams = false`**：运行时没有文件系统，未预渲染的 slug 走到 `getPost()` 会让 `fs` 抛错拿到 500。别删。
 
 **自定义 MDX 组件**（`lib/mdx-components.tsx`）：`<Note type="info|tip|warn">`、`a`（内外链区分）、`img`（走 next/image）
 
@@ -346,6 +370,83 @@ Container(narrow) > GlassCard > MDXContent
 ### ADR-5：目录 id 必须用 github-slugger
 `lib/toc.ts` 和 rehype-slug 用同一个库、同样的调用顺序，重名标题的 `-1`/`-2` 后缀才能对上。**不要自己实现 slug 化。**
 
+---
+
+> 以下三条来自 2026-08-06 上线当天的实际部署事故，**每一条都对应一次线上失败**。
+> 改动 `wrangler.jsonc` / `open-next.config.ts` / `src/lib/shiki.ts` 之前务必读完。
+
+### ADR-6：`wrangler.jsonc` 必须提交进仓库，`name` 必须是 `mio-blog`
+
+缺了它时 `npx wrangler deploy` 会走框架自动探测，在非交互环境下静默调用
+`@opennextjs/cloudflare migrate` 现场生成配置。而模板里的 `<WORKER_NAME>` 占位符
+取自 `package.json` 的 `name`（见 `cli/utils/create-wrangler-config.js` 第 41、80-83 行），
+也就是 **`personal-web`** —— 与 Cloudflare 上真实的 Worker `mio-blog` 对不上，
+自引用服务绑定于是指向一个不存在的 Worker：
+
+```
+Service binding 'WORKER_SELF_REFERENCE' references Worker 'personal-web'
+which was not found. [code: 10143]
+```
+
+**注意 `package.json` 的 `name` 仍然是 `personal-web`**，两者本来就不同名，别去"统一"它们，
+把 `wrangler.jsonc` 的 `name` 固定住即可。
+
+配置里**刻意不声明 `WORKER_SELF_REFERENCE`**：它只被 ISR 重验证队列使用，本站用不上；
+且首次部署时 Worker 自身尚不存在，声明反而会再次触发 10143。
+
+### ADR-7：Shiki 只注册用到的语言，**不要换回 rehype-pretty-code**
+
+Cloudflare Workers 免费版脚本上限是 **3 MiB（gzip 后）**。
+`rehype-pretty-code` 顶部是静态的 `import { getSingletonHighlighter } from 'shiki'`，
+shiki 主入口会把 200 多种语言语法和全部主题挂进模块图，
+esbuild 实测这条链单独就是 **10.15 MB / gzip 1.74 MB**，直接超限：
+
+```
+Your Worker exceeded the size limit of 3 MiB. [code: 10027]
+```
+
+**踩过的弯路**：只覆盖 `rehype-pretty-code` 的 `getHighlighter` 选项**没有任何效果** ——
+那只替换运行时实例，静态 import 该拖进来的照样拖进来（实测 trace 体积纹丝不动）。
+必须换掉插件本身，改用 `@shikijs/rehype/core` 的 `rehypeShikiFromHighlighter`，
+它只接收一个现成的 highlighter。
+
+换完实测：trace 从 15.70 MB → 5.90 MB，其中 shiki 从 10.22 MB / 343 个文件 → 0.18 MB / 13 个。
+
+`src/lib/shiki.ts` 里那个 `LANGS` 数组是白名单，**站主写文章用了新语言就要往里加**
+（配了 `fallbackLanguage: 'plaintext'`，不加不会让构建失败，但那段代码没有配色，也没有告警）。
+同文件里的 transformer 复刻了 rehype-pretty-code 的输出结构
+（`figure[data-rehype-pretty-code-figure]` + `figcaption[data-rehype-pretty-code-title]`），
+**`globals.css` 的选择器依赖这个结构**，改 transformer 要同步看 CSS。
+
+### ADR-8：`open-next.config.ts` 必须配 `incrementalCache`
+
+**OpenNext 的 incremental cache 不只服务 ISR —— 构建期预渲染出来的 SSG 页面
+也是存在这里、并从这里取的。** 不配时是空实现，每次请求都是 cache miss，
+Worker 会当场重新执行路由代码，而 Cloudflare Workers **没有文件系统**，
+`src/lib/posts.ts` 的 `fs` 一篇文章都读不到。线上表现是：
+
+```
+/blog/<slug>        → 404
+/search-index.json  → []
+/sitemap.xml        → 只剩 3 条静态路由
+/ 与 /blog          → 页面在，文章列表空白
+```
+
+**这条曾被误判过**：当时以为"全站 SSG、没有 ISR，所以不需要缓存"，还把部署日志里的
+`Incremental cache does not need populating` 当成佐证 —— 那句话的实际含义是
+"没有配置缓存所以无需填充"。migrate 阶段的 `WARN Failed to set up cache for your project`
+也是同一件事的提示。
+
+用的是 `static-assets-incremental-cache`，官方注释原文：
+*should only be used for applications that do NOT want revalidation and ONLY want to
+serve prerendered data* —— 正是本站情况。它从 Workers Assets 读预渲染产物，
+不需要额外开 KV / R2，不产生费用。配置后 `opennextjs-cloudflare deploy` 的 populate 阶段
+才会执行 `.open-next/cache` → `.open-next/assets/cdn-cgi/_next_cache` 的拷贝
+（`populate-cache.js:534`）。
+
+**快速判断线上是不是又犯了这个病**：打开 `/sitemap.xml`，如果 `<lastmod>` 等于你
+**当前访问的时刻**而不是构建时刻，就说明在实时渲染，没走预渲染产物。
+
 ### 已删除 / 明确不要重新引入的功能
 
 | 功能 | 为什么删 |
@@ -358,6 +459,8 @@ Container(narrow) > GlassCard > MDXContent
 | **Repository Pattern** | 见 ADR-1 |
 | **Canvas / WebGL / 粒子引擎** | 站主明确要求纯 CSS 动效 |
 | **`reading-time` 依赖** | 按空格分词，中文会算成 1 个词。已换成 `lib/utils.ts` 自己实现的 `estimateReadingTime`（中文 400 字/分、英文 200 词/分） |
+| **`rehype-pretty-code`** | 见 ADR-7，会把 Worker 撑爆 3 MiB 上限。已卸载，别装回来 |
+| **`output: 'export'`** | 见 ADR-2。撞上 3 MiB 限制时曾作为备选被提出，站主选择了精简 Shiki 而不是推翻 ADR-2 |
 
 ---
 
@@ -400,15 +503,22 @@ Container(narrow) > GlassCard > MDXContent
 
 1. **社交链接只剩 B 站** — X / GitHub / Email 已在 `src/config/site.ts` 的 `social` 数组里
    注释掉（原本是 `your_handle` 这类占位地址，会变成死链、甚至可能指到陌生人账号上）。
-   **拿到真实地址后取消注释、替换即可，一行搞定。**
-2. **上线时要设 `NEXT_PUBLIC_SITE_URL`** — 否则 sitemap 和分享卡片里的链接会是 `http://localhost:3000`。
-   部署平台（Vercel 等）加个环境变量即可，不用改代码。见 `.env.example`。
-3. **项目未初始化 git** — 站主要求暂不处理，但要意识到**当前任何文件删除都不可恢复**。
+   **拿到真实地址后取消注释、替换即可，一行搞定。绝不要编占位值。**
+2. **`www` 子域未处理** — 只绑了 `blog.reikaakane.com`。`www.blog.reikaakane.com` 打不开。
+   站主没提过需求，要做得在 Cloudflare 加自定义域名或重定向规则。
 
 ### P2（可选打磨）
 
 4. **3 篇示例文章是 AI 写的占位内容**（hello-world / rsc-notes / stage-lights），
-   站主可自行替换或删除。**注意没有 git，删了找不回来。**
+   站主可自行替换或删除。现在有 git 了，但**删站主的内容之前仍然必须先问**。
+
+7. **本地 `npm run cf:preview` 在站主的 Windows 机器上跑不了** — OpenNext 打包要创建符号链接，
+   未开启开发者模式时报 `EPERM: operation not permitted, symlink`。
+   **这意味着 AI 无法在本地验证 OpenNext 最终产物和 gzip 体积**，这两项只能靠 CI 或线上实测。
+   `next build` 本身不受影响，可以正常跑。
+
+8. **`public/_headers` 没有创建** — migrate 本来会生成它（给 `_next/static/*` 设 immutable 缓存头）。
+   当前靠 Workers Assets 的默认缓存策略，能用但不是最优。属于可选优化。
 5. **搜索索引体积**随文章增长线性上升（当前 4 篇约 25KB）。涨到几百篇时可以考虑
    改成服务端搜索 API —— 因为保留了标准 Next.js 运行时，加 `/api/search` 不用改部署方式。
 6. **三处 `eslint-disable react-hooks/set-state-in-effect`**
@@ -417,7 +527,25 @@ Container(narrow) > GlassCard > MDXContent
    服务端算不了、必须挂载后才能拿到值，注释里都写明了原因。
    代价只是一次额外渲染，**属于合理取舍，不建议为了消掉告警而增加代码复杂度**。
 
-### 已修复（2026-08-06 本轮）
+### 已修复（2026-08-06 上线轮）
+
+上线当天连续四次部署失败，全部解决。**每一条都已固化成 ADR-6 / 7 / 8，改动相关文件前先读。**
+
+| 原问题 | 根因 | 怎么修的 |
+|---|---|---|
+| `error 10143` 自引用绑定指向不存在的 Worker | 仓库缺 `wrangler.jsonc`，CI 现场生成时按 `package.json` 的 `name` 取名 | 固化 `wrangler.jsonc`，`name` 写死 `mio-blog`，且不声明 `WORKER_SELF_REFERENCE`（ADR-6） |
+| `npm error Missing script: "cf:build"` | Cloudflare 的构建命令改了，但代码还没合进 `main`（CI 装了 561 个包而非 840 多个） | 把 PR 合进 main。**判断依据：日志开头 `added NNN packages`** |
+| `error 10027` Worker 超 3 MiB（gzip 3.565 MiB） | `rehype-pretty-code` 静态 import shiki 完整包 | 换 `@shikijs/rehype/core` + 精简 highlighter（ADR-7） |
+| 文章全 404、搜索返回 `[]`、sitemap 缺文章 | `open-next.config.ts` 没配 `incrementalCache`，预渲染产物从未上传 | 配 `static-assets-incremental-cache`（ADR-8）；另加 `dynamicParams = false` |
+| sitemap 指向 `reikaakane.com` 而非 `blog.` 子域 | `NEXT_PUBLIC_SITE_URL` 是构建期内联，改完变量必须重新构建才生效 | 站主改构建变量 + 触发新构建 |
+| README 说"`ts`/`json` 等常见语言都支持" | 精简 Shiki 后只剩 `glsl`/`tsx`/`bash`，照原文写会静默失去配色 | 改成说明白名单机制，指向 `更新与发布.md` 第 3 节 |
+| README 说"部署前把 `site.ts` 的 `url` 改成真实域名" | 该字段早已改读环境变量 | 改成说明走 `NEXT_PUBLIC_SITE_URL` 构建变量 |
+
+**线上终验（2026-08-06）**：10 条路由全 200；未知 slug 干净 404；三种语言代码高亮正常
+（token 数 917 / 116 / 16）；4 个代码块标题齐全；搜索索引 4 条；sitemap 7 条且全部指向
+`blog.` 子域；KaTeX 101 个公式节点。
+
+### 已修复（2026-08-06 文档整理轮）
 
 | 原问题 | 怎么修的 |
 |---|---|
@@ -451,14 +579,22 @@ Container(narrow) > GlassCard > MDXContent
    不要写死 from-sakura-500 这类，否则主题色滑块管不到。
 5. 氛围动效只能用纯 CSS，禁止 Canvas / WebGL / 粒子引擎。
 6. 搜索必须用 Fuse.js，不要换成基于分词器的库（中文没空格会失效）。
+7. 站点部署在 Cloudflare Workers 上，有 3 MiB（gzip 后）的脚本体积上限。
+   不要装体积大的运行时依赖；代码高亮已精简过，不要换回 rehype-pretty-code（见 ADR-7）。
+8. wrangler.jsonc 和 open-next.config.ts 是部署命脉，别删别改名（见 ADR-6、ADR-8）。
+   Cloudflare 的构建命令必须是 npm run cf:build，不是 npm run build。
+9. Workers 运行时没有文件系统。任何依赖 fs 的代码只能在构建期跑。
 
 工作方式要求：
 - 改完代码要跑 npm run typecheck 和 npm run lint，必须零错误。
 - 涉及界面的改动要在浏览器里实际验证（项目有 .claude/launch.json，
   用 preview_start 起 dev server），用具体数据说明验证结果，不要只看代码下结论。
+- 我的机器是 Windows 且未开开发者模式，npm run cf:preview 跑不了（符号链接 EPERM）。
+  OpenNext 最终产物和 gzip 体积你在本地验证不了，别假装验证过了，说清楚哪些没验到。
 - 发现我给的需求有边界情况没考虑到（尤其是移动端适配），主动提出并处理。
 - 如果验证中发现问题，如实告诉我，包括你之前判断错的地方。
-- 项目还没有 git，删文件不可恢复。要删我的内容（文章、图片、配置）之前先问我。
+- 要删我的内容（文章、图片、配置）之前先问我。
+- 推送到 main 会自动触发线上部署，推之前先问我。
 - 涉及我的真实信息（社交账号链接、域名、邮箱）时不要编造占位值，直接问我要。
 
 今天我想做的是：<在这里写你的需求>
@@ -473,7 +609,16 @@ npm run dev        # 本地开发 http://localhost:3000
 npm run build      # 生产构建（文章、搜索索引都在这一步生成）
 npm run typecheck  # TypeScript 检查
 npm run lint       # ESLint
+npm run cf:build   # Cloudflare 部署用的构建（CI 跑的就是这条）
+npm run cf:preview # 本地 workerd 预览 —— 站主的 Windows 机器上跑不了，见 P2-7
+npm run cf:deploy  # 手动部署（正常走 git push 自动部署，一般用不到）
 node scripts/extract-audio-covers.mjs   # 从 public/audio/ 的 mp3 提取内嵌专辑封面
+```
+
+线上自检（部署后确认）：
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://blog.reikaakane.com/blog/physically-based-rendering
 ```
 
 ## 附录：新增一篇文章的完整流程
@@ -481,4 +626,8 @@ node scripts/extract-audio-covers.mjs   # 从 public/audio/ 的 mp3 提取内嵌
 1. 在 `content/blog/` 建 `my-post.mdx`（文件名即 URL）
 2. 写 frontmatter：`title` / `date` / `summary` / `category` / `tags` 必填，`cover` / `draft` / `slug` 可选（由 `src/lib/schema.ts` 的 zod 校验，写错构建期直接报错）
 3. 配图放 `public/images/blog/<slug>/`
-4. 完事。列表、目录、搜索索引、sitemap、相关文章全部自动更新，无需任何配置
+4. **如果正文里的代码块用了 `glsl` / `tsx` / `bash` 以外的语言，必须去 `src/lib/shiki.ts`
+   的 `LANGS` 数组里加上**（见 ADR-7）。不加不会报错，但那段代码没有配色，也没有告警。
+5. 跑 `npm run build` 自查（frontmatter 校验、MDX 语法、公式语法都只在构建期报错）
+6. `git push origin main` 后 Cloudflare 自动构建上线，约 3 分钟
+7. 列表、目录、搜索索引、sitemap、相关文章全部自动更新，无需任何配置
