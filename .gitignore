@@ -8,6 +8,9 @@ build/
 .wrangler/
 .dev.vars
 
+# 音频重编码的试听候选（几十 MB，只用来对比码率，选定后手动替换 public/audio/）
+MioSrc/audio-reencode/
+
 .DS_Store
 *.pem
 
