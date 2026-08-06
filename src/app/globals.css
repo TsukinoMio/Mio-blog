@@ -1,0 +1,538 @@
+@import 'tailwindcss';
+
+/* ==========================================================================
+   设计 Token —— 全站视觉的唯一来源
+   Tailwind v4 会把这里的变量自动编译成工具类：
+   --color-sakura-400  ->  bg-sakura-400 / text-sakura-400 / border-sakura-400
+   --radius-card       ->  rounded-card
+   --ease-idol         ->  ease-idol
+   --animate-float     ->  animate-float
+
+   站点的"强调色"（渐变文字、按钮辉光等）不是写死的 sakura/lavender/aqua，
+   而是走下面的 --accent-* 运行时变量，见"可调节的主题强调色"一节。
+   默认是白色；首页左侧的 ThemePicker 拖动色相滑块时，ThemeProvider 会算出
+   一整套颜色写进 <html> 的内联样式来覆盖默认值。
+   ========================================================================== */
+@theme {
+  /* 樱粉 —— 主色，用于强调、主按钮、主辉光 */
+  --color-sakura-50: #fff5f9;
+  --color-sakura-100: #ffe8f2;
+  --color-sakura-200: #ffd0e4;
+  --color-sakura-300: #ffaed0;
+  --color-sakura-400: #ff85b8;
+  --color-sakura-500: #fb5f9f;
+  --color-sakura-600: #ea3f83;
+  --color-sakura-700: #c22a66;
+
+  /* 薰衣草紫 —— 副色，用于渐变过渡与次级强调 */
+  --color-lavender-50: #f8f5ff;
+  --color-lavender-100: #efe8ff;
+  --color-lavender-200: #e0d3ff;
+  --color-lavender-300: #cbb4ff;
+  --color-lavender-400: #b391fb;
+  --color-lavender-500: #9b73f0;
+  --color-lavender-600: #8556da;
+  --color-lavender-700: #6b41b4;
+
+  /* 浅天蓝 —— 点缀色，用于链接、清爽区块 */
+  --color-aqua-50: #f0fbff;
+  --color-aqua-100: #dff5ff;
+  --color-aqua-200: #bfeaff;
+  --color-aqua-300: #93dbff;
+  --color-aqua-400: #5fc7fb;
+  --color-aqua-500: #35aef0;
+  --color-aqua-600: #1f8fcd;
+  --color-aqua-700: #1a6f9e;
+
+  /* 墨色 —— 暖调紫灰，比纯黑柔和，符合日系氛围 */
+  --color-ink-400: #a596ae;
+  --color-ink-500: #8a7897;
+  --color-ink-600: #6f5c7d;
+  --color-ink-700: #5d4a6b;
+  --color-ink-800: #4a3856;
+  --color-ink-900: #3a2b45;
+
+  --color-cream: #fffaf8;
+
+  /* 字体：拉丁走系统无衬线，中文回落到系统 CJK 字体（不加载 5MB 网络字体） */
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+
+  /* 圆角 */
+  --radius-card: 1.5rem;
+  --radius-pill: 999px;
+
+  /* 阴影与辉光（强调色相关的辉光在下面的 --accent-shadow 里，随主题切换） */
+  --shadow-soft: 0 8px 32px -12px rgba(120, 80, 140, 0.18);
+  --shadow-lift: 0 18px 48px -18px rgba(120, 80, 140, 0.28);
+
+  /* 缓动：柔和的"舞台落幕"曲线 */
+  --ease-idol: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 动效（全部为纯 CSS，不使用 Canvas / WebGL） */
+  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-float: float 9s ease-in-out infinite;
+  --animate-twinkle: twinkle 4s ease-in-out infinite;
+  --animate-drift: drift 26s linear infinite;
+  --animate-shimmer: shimmer 6s ease-in-out infinite;
+  --animate-eq: eq 1.1s ease-in-out infinite;
+}
+
+/* 入场：淡入 + 轻微上移。配合内联 animation-delay 做 stagger */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 光晕漂浮 */
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -28px, 0) scale(1.06);
+  }
+}
+
+/* 星光闪烁 */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.15);
+  }
+}
+
+/* 星层缓慢横移，制造纵深 */
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-60px, -30px, 0);
+  }
+}
+
+/* 标题渐变流动 */
+@keyframes shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* 播放中的音量条跳动 */
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/* ==========================================================================
+   基础层
+   ========================================================================== */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    /* 背景图与渐变由 <Background /> 组件负责渲染，body 只留兜底底色 */
+    background-color: var(--color-cream);
+    color: var(--color-ink-800);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-sakura-200);
+    color: var(--color-ink-900);
+  }
+
+  /* 键盘可访问性：统一焦点环 */
+  :focus-visible {
+    outline: 2px solid var(--color-sakura-400);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* 细滚动条 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-sakura-200) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-sakura-200);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-sakura-300);
+    background-clip: content-box;
+  }
+}
+
+/* ==========================================================================
+   可调节的主题强调色
+   --------------------------------------------------------------------------
+   全站所有原本写死的粉/紫/蓝渐变（按钮、头像光环、辉光阴影……）现在都改用
+   下面这几个变量。默认是白色；ThemePicker 组件（首页左侧的浮动面板）里的
+   色相滑块拖动时，由 ThemeProvider 用 JS 算出对应颜色，直接写成 <html> 的
+   内联样式覆盖这里的默认值（内联样式优先级天然高于这里的 :root 规则，
+   所以不需要预设几套 data-accent 主题、颜色是连续算出来的）。
+
+   --accent-1/2/3      渐变色标（文字渐变、柔光晕），白色主题下三个都是白
+   --accent-strong-1/2 按钮/图标背景用的更饱和一档的颜色对，白色主题下接近白，
+                       颜色主题下用更深的色，好让下面的文字/图标看得清
+   --accent-foreground 叠在 accent-strong 背景上的文字或图标颜色——
+                       白色主题下是深墨色（背景是白的），颜色主题下是白色
+   --accent-solid      给"必须有色差才看得见"的小控件用（滑块、卡片悬停描边）——
+                       白色主题下用中性灰而不是纯白，否则控件会在白底面板上隐形
+   --accent-shadow     按钮/头像的辉光阴影颜色
+   --accent-border     GlassCard 悬停时的描边颜色
+   ========================================================================== */
+:root {
+  --accent-1: #ffffff;
+  --accent-2: #ffffff;
+  --accent-3: #ffffff;
+  --accent-strong-1: #ffffff;
+  --accent-strong-2: #f2f0f6;
+  --accent-foreground: var(--color-ink-800);
+  --accent-solid: #c7c3d6;
+  --accent-shadow: rgba(20, 16, 30, 0.22);
+  --accent-border: rgba(20, 16, 30, 0.14);
+}
+
+/* 按钮 / 图标背景：更饱和一档，配合 --accent-foreground 保证文字可读 */
+@utility bg-accent-gradient {
+  background-image: linear-gradient(135deg, var(--accent-strong-1), var(--accent-strong-2));
+}
+
+@utility bg-accent-gradient-r {
+  background-image: linear-gradient(90deg, var(--accent-strong-1), var(--accent-strong-2));
+}
+
+@utility text-accent-foreground {
+  color: var(--accent-foreground);
+}
+
+@utility bg-accent-gradient-vertical {
+  background-image: linear-gradient(180deg, var(--accent-1), var(--accent-2), var(--accent-3));
+}
+
+/* 半透明三色版本：用于头像背后的柔光晕、卡片占位封面 */
+@utility bg-accent-gradient-soft {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--accent-1) 55%, transparent),
+    color-mix(in oklab, var(--accent-2) 48%, transparent),
+    color-mix(in oklab, var(--accent-3) 55%, transparent)
+  );
+}
+
+@utility bg-accent-1 {
+  background-color: var(--accent-1);
+}
+@utility bg-accent-2 {
+  background-color: var(--accent-2);
+}
+@utility bg-accent-3 {
+  background-color: var(--accent-3);
+}
+
+@utility shadow-glow-accent {
+  box-shadow: 0 16px 44px -16px var(--accent-shadow);
+}
+
+@utility border-accent {
+  border-color: var(--accent-border);
+}
+
+/* ==========================================================================
+   自定义工具类
+   ========================================================================== */
+
+/* 渐变文字：用于站名与大标题。默认白色主题下三个色标都是白，等于纯白文字 */
+@utility text-gradient {
+  background-image: linear-gradient(100deg, var(--accent-1), var(--accent-2), var(--accent-3), var(--accent-1));
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: var(--animate-shimmer);
+  /* 白色主题下文字是纯白的，光靠颜色在白色卡片/浅色背景上会看不清，
+     所以加一层柔和阴影兜底可读性（颜色主题下则是恰到好处的立体感） */
+  filter: drop-shadow(0 1px 2px rgba(20, 16, 30, 0.32)) drop-shadow(0 6px 16px rgba(20, 16, 30, 0.16));
+}
+
+/* 多行截断 */
+@utility line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@utility line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   MDX 正文排版（不引入 typography 插件，保持依赖精简与完全可控）
+   ========================================================================== */
+.mdx-body {
+  color: var(--color-ink-700);
+  font-size: 1.0625rem;
+  line-height: 1.9;
+  word-break: break-word;
+}
+
+.mdx-body > * + * {
+  margin-top: 1.15em;
+}
+
+.mdx-body h1,
+.mdx-body h2,
+.mdx-body h3,
+.mdx-body h4 {
+  color: var(--color-ink-900);
+  font-weight: 700;
+  line-height: 1.4;
+  /* 留出吸顶 Header 的高度，点目录跳过来时标题不会被挡住 */
+  scroll-margin-top: 6rem;
+}
+
+/* 正文里的一级标题：有些文章（比如从别处导出的笔记）用 # 当章节标题 */
+.mdx-body h1 {
+  margin-top: 2.6em;
+  font-size: 1.75rem;
+}
+
+.mdx-body h2 {
+  margin-top: 2.4em;
+  font-size: 1.5rem;
+  padding-bottom: 0.4em;
+  border-bottom: 1px solid rgba(255, 174, 208, 0.35);
+}
+
+.mdx-body h3 {
+  margin-top: 2em;
+  font-size: 1.25rem;
+}
+
+.mdx-body h4 {
+  margin-top: 1.6em;
+  font-size: 1.0625rem;
+}
+
+.mdx-body a {
+  color: var(--color-lavender-600);
+  text-decoration: underline;
+  text-decoration-color: var(--color-lavender-300);
+  text-underline-offset: 4px;
+  transition: color 0.2s var(--ease-idol);
+}
+
+.mdx-body a:hover {
+  color: var(--color-sakura-600);
+  text-decoration-color: var(--color-sakura-300);
+}
+
+.mdx-body strong {
+  color: var(--color-ink-900);
+  font-weight: 700;
+}
+
+.mdx-body ul,
+.mdx-body ol {
+  padding-left: 1.4em;
+}
+
+.mdx-body ul {
+  list-style: disc;
+}
+
+.mdx-body ol {
+  list-style: decimal;
+}
+
+.mdx-body li::marker {
+  color: var(--color-sakura-400);
+}
+
+.mdx-body li + li {
+  margin-top: 0.5em;
+}
+
+.mdx-body blockquote {
+  padding: 0.85em 1.2em;
+  border-left: 3px solid var(--color-sakura-300);
+  border-radius: 0 0.75rem 0.75rem 0;
+  background: rgba(255, 245, 249, 0.7);
+  color: var(--color-ink-600);
+  font-style: normal;
+}
+
+.mdx-body blockquote > * + * {
+  margin-top: 0.6em;
+}
+
+.mdx-body hr {
+  margin: 2.6em 0;
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-sakura-200),
+    var(--color-lavender-200),
+    transparent
+  );
+}
+
+.mdx-body img {
+  width: 100%;
+  height: auto;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-soft);
+}
+
+/* 行内代码 */
+.mdx-body :not(pre) > code {
+  padding: 0.15em 0.45em;
+  border-radius: 0.4rem;
+  background: rgba(255, 232, 242, 0.85);
+  color: var(--color-sakura-700);
+  font-size: 0.9em;
+}
+
+/* 代码块（rehype-pretty-code 输出，构建期高亮，零运行时） */
+.mdx-body pre {
+  padding: 1.15rem 1.25rem;
+  border-radius: 1rem;
+  background: #2a2233 !important;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.75;
+  box-shadow: var(--shadow-soft);
+}
+
+.mdx-body pre code {
+  display: grid; /* 使行号/行高亮可用 */
+  background: transparent;
+  counter-reset: line;
+}
+
+.mdx-body figure[data-rehype-pretty-code-figure] {
+  margin-top: 1.6em;
+}
+
+.mdx-body [data-rehype-pretty-code-title] {
+  padding: 0.5rem 1.1rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+  background: #3a3145;
+  color: var(--color-sakura-200);
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.mdx-body [data-rehype-pretty-code-title] + pre {
+  margin-top: 0;
+  border-radius: 0 0 1rem 1rem;
+}
+
+/* 表格 */
+.mdx-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.mdx-body th,
+.mdx-body td {
+  padding: 0.65em 0.9em;
+  border-bottom: 1px solid rgba(203, 180, 255, 0.3);
+  text-align: left;
+}
+
+.mdx-body th {
+  color: var(--color-ink-900);
+  font-weight: 600;
+  background: rgba(248, 245, 255, 0.6);
+}
+
+/* 从搜索结果点进文章时高亮的关键词（见 blog/SearchHighlighter.tsx） */
+.mdx-body mark.search-hit {
+  border-radius: 0.25rem;
+  padding: 0.05em 0.15em;
+  background: rgba(255, 208, 228, 0.75);
+  color: inherit;
+}
+
+/* 点中的那一处再重一点，滚过去之后一眼能看到 */
+.mdx-body mark.search-hit-current {
+  background: var(--color-sakura-300);
+  box-shadow: 0 0 0 3px rgba(255, 174, 208, 0.45);
+}
+
+/* 数学公式（KaTeX，见 MDXContent.tsx 的 remarkMath / rehypeKatex） */
+.mdx-body .katex {
+  color: var(--color-ink-900);
+  font-size: 1.05em;
+}
+
+/* 块级公式（$$...$$）左右留白，太宽的公式横向滚动而不是撑破卡片 */
+.mdx-body .katex-display {
+  margin: 1.4em 0;
+  padding: 0.4em 0.2em;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ==========================================================================
+   无障碍：尊重系统的"减少动态效果"设置
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

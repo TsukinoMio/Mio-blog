@@ -1,0 +1,28 @@
+{
+  "id": "recent",
+  "name": "最近在循环",
+  "description": "写代码时的背景音。换成你自己的歌：把音频丢进 public/audio/，改这个文件即可。",
+  "tracks": [
+    {
+      "id": "harmony-4-you",
+      "title": "Harmony 4 You",
+      "artist": "765 MILLION ALLSTARS",
+      "src": "/audio/765%20MILLION%20ALLSTARS%20-%20Harmony%204%20You.mp3",
+      "cover": "/images/covers/765-million-allstars-harmony-4-you.jpg"
+    },
+    {
+      "id": "union",
+      "title": "UNION!!",
+      "artist": "765 MILLION ALLSTARS",
+      "src": "/audio/765%20MILLION%20ALLSTARS%20-%20UNION!!.mp3",
+      "cover": "/images/covers/765-million-allstars-union.jpg"
+    },
+    {
+      "id": "rat-a-tat",
+      "title": "Rat A Tat!!!",
+      "artist": "MILLIONSTARS",
+      "src": "/audio/MILLIONSTARS%20-%20Rat%20A%20Tat!!!.mp3",
+      "cover": "/images/covers/millionstars-rat-a-tat.jpg"
+    }
+  ]
+}
