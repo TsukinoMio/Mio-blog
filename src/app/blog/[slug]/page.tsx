@@ -24,6 +24,15 @@ export async function generateStaticParams() {
   return slugs.map((slug) => ({ slug }));
 }
 
+/**
+ * 只认构建期生成出来的 slug，其余直接 404。
+ *
+ * 部署在 Cloudflare Workers 上时这一条是必需的：运行时没有文件系统，
+ * 未预渲染的 slug 一旦走到这里，getPost() 里的 fs 读取会直接抛错，
+ * 拿到的是 500 而不是干净的 404 页。
+ */
+export const dynamicParams = false;
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const post = await getPost(slug);
