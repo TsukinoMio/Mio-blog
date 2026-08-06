@@ -19,8 +19,21 @@ export interface SocialLink {
 export const siteConfig = {
   /** 站点名（显示在 Header 与浏览器标题） */
   name: 'ReikaAkane',
-  /** 副标题 / 站点定位 */
-  tagline: 'れいかあかね',
+  /**
+   * 副标题 / 站点定位。
+   * 留空就只显示站点名 —— 浏览器标题和页脚都会跳过分隔符，不会留下孤零零的点。
+   */
+  tagline: '',
+  /**
+   * 浏览器标签页左边的小图标（favicon）。
+   *
+   * 换图标：把新图片放进 public/（比如 public/images/my-icon.png），
+   * 再把这里改成对应路径即可，svg / png / ico 都行，不用改代码。
+   *
+   * 注意：**不要**把图标放回 src/app/icon.svg —— 那是 Next.js 的文件约定，
+   * 一旦那个文件存在就会自动接管、覆盖这里的配置，等于这个字段失效。
+   */
+  icon: '/icon.svg',
   /** 作者名（用于 SEO 与版权信息） */
   author: 'ReikaAkane',
   /** 一句话自我定位，显示在关于页头像旁边 */
@@ -28,7 +41,7 @@ export const siteConfig = {
   /** 首页正中央的大字标语（src/components/home/Tagline.tsx） */
   homeSlogan: 'これからも アイドル!!!!!!',
   /** 站点描述（SEO，会进搜索结果和分享卡片，写一句完整的话效果最好） */
-  description: 'ReikaAkane 的个人空间。记录代码与图形学笔记、听过的歌，以及那些让人心动的舞台。',
+  description: 'ReikaAkane',
   /**
    * 线上地址，用于 sitemap 和分享卡片的图片链接。
    *

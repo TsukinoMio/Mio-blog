@@ -142,8 +142,20 @@ effects: { starfield: false, glowOrbs: false }
 
 界面上出现的每一句话都能在两个配置文件里找到，不需要去改组件代码：
 
-- `src/config/site.ts` —— 站点"身份"：站名、一句话定位、首页大字标语（`homeSlogan`）、导航项、社交链接、线上域名（用于 sitemap 与 OG）
+- `src/config/site.ts` —— 站点"身份"：站名、一句话定位、首页大字标语（`homeSlogan`）、导航项、社交链接、线上域名（用于 sitemap 与 OG）、浏览器标签页图标（`icon`）
 - `src/config/copy.ts` —— 界面"外壳"文案：按钮文字、区块标题、空状态提示、无障碍朗读文本，按页面/组件分组，改哪一句直接在对应分组里改就行
+
+### 换浏览器标签页图标（favicon）
+
+图片放进 `public/`（比如 `public/images/my-icon.png`），把 `site.ts` 的 `icon` 改成对应路径即可，svg / png / ico 都支持：
+
+```ts
+icon: '/images/my-icon.png',
+```
+
+**注意别把图标放回 `src/app/icon.svg`** —— 那是 Next.js 的文件约定，只要那个文件存在就会自动接管并覆盖 `site.ts` 的配置。默认图标现在放在 `public/icon.svg`。
+
+另外标签页标题里名字后面的 `·` 来自 `tagline`：`tagline` 留空就只显示站名，不会留下孤零零的分隔点。
 
 `site.ts` 里的 `url` **不用改代码** —— 它读的是环境变量 `NEXT_PUBLIC_SITE_URL`，在 Cloudflare 的构建变量里配置即可（当前值 `https://blog.reikaakane.com`）。没配时退回 `http://localhost:3000`，故意用一个一眼能看出"还没配"的值。详见 `更新与发布.md` 第 4 节。
 
