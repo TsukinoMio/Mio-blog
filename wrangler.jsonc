@@ -1,0 +1,55 @@
+{
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cloudflare Workers 部署配置。
+  //
+  // 【这个文件必须提交进仓库，不能靠 CI 现场生成】
+  // 缺了它时，`npx wrangler deploy` 会走框架自动探测，在非交互环境下静默调用
+  // `@opennextjs/cloudflare migrate`，由它按模板生成配置。而模板里的
+  // <WORKER_NAME> 占位符取的是 package.json 的 name 字段（见适配器源码
+  // cli/utils/create-wrangler-config.js 第 41、80-83 行），也就是 "personal-web"，
+  // 跟 Cloudflare 上真实的 Worker "mio-blog" 对不上，于是自引用绑定指向了
+  // 一个不存在的 Worker，部署直接失败：
+  //     Service binding 'WORKER_SELF_REFERENCE' references Worker 'personal-web'
+  //     which was not found. [code: 10143]
+  // 把配置固化在这里，migrate 就不会再跑，名字也不会再错。
+  // ─────────────────────────────────────────────────────────────────────────
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // 必须与 Cloudflare 控制台里的 Worker 名字完全一致。改名时两边要同步改
+  "name": "mio-blog",
+
+  // OpenNext 打包产物入口，由 `npm run cf:build` 生成
+  "main": ".open-next/worker.js",
+
+  "compatibility_date": "2026-08-06",
+
+  // nodejs_compat：Next.js 服务端代码依赖 Node 内置模块（path / stream 等）
+  // global_fetch_strictly_public：让 Worker 内的 fetch 走公网而不是回环到自身，
+  //   next/image 优化时要去取自己域名下的原图，少了它会取不到
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  // 静态资源（_next/static、public/ 下的图片音频）由 Workers Assets 直接托管，
+  // 不进 Worker 脚本体积
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+
+  // next/image 的图片优化后端。next.config.ts 里开了 avif/webp，
+  // 页面会渲染出 /_next/image?url=... 的地址，少了这个绑定全站图片会挂
+  "images": {
+    "binding": "IMAGES"
+  },
+
+  "observability": {
+    "enabled": true
+  }
+
+  // 注意：这里刻意【不】声明 WORKER_SELF_REFERENCE 自引用绑定。
+  // 它只被 ISR / on-demand revalidate 的重验证队列用到，本站所有页面都是
+  // 构建期静态生成，用不上（上次部署日志里 "Incremental cache does not need
+  // populating" 已经实证）。而且首次部署时 Worker 本身还不存在，
+  // 声明自引用反而会再触发一次 10143。
+  // 将来真加了 ISR，再按 https://opennext.js.org/cloudflare/caching
+  // 补上 services + 缓存后端即可。
+}

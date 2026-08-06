@@ -3,6 +3,11 @@ node_modules/
 out/
 build/
 
+# Cloudflare / OpenNext 构建产物与本地密钥
+.open-next/
+.wrangler/
+.dev.vars
+
 .DS_Store
 *.pem
 
