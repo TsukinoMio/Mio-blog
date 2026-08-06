@@ -21,3 +21,13 @@
 # 专辑封面、头像、背景图、文章配图。同样不带哈希，同样给 30 天 + 回源校验。
 /images/*
   Cache-Control: public, max-age=2592000, must-revalidate
+
+# 站点图标（favicon）。它由 src/config/site.ts 的 icon 指向，按惯例放在根目录，
+# 上面那几条通配都盖不到，所以单列。
+# 【换图标时如果文件名也变了，记得同步改这里】 ——
+# 或者干脆把图标放进 public/images/，那样就自动落进上面 /images/* 的规则，不用管这里。
+/my-icon.png
+  Cache-Control: public, max-age=2592000, must-revalidate
+
+/icon.svg
+  Cache-Control: public, max-age=2592000, must-revalidate

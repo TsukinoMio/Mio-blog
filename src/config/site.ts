@@ -33,7 +33,7 @@ export const siteConfig = {
    * 注意：**不要**把图标放回 src/app/icon.svg —— 那是 Next.js 的文件约定，
    * 一旦那个文件存在就会自动接管、覆盖这里的配置，等于这个字段失效。
    */
-  icon: '/icon.svg',
+  icon: '/my-icon.png',
   /** 作者名（用于 SEO 与版权信息） */
   author: 'ReikaAkane',
   /** 一句话自我定位，显示在关于页头像旁边 */
