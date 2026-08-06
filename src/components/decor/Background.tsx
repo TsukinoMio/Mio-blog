@@ -19,8 +19,14 @@ export function Background() {
     <div
       aria-hidden
       className={cn(
-        'pointer-events-none inset-0 -z-10 overflow-hidden',
-        background.fixed ? 'fixed' : 'absolute',
+        'pointer-events-none -z-10 overflow-hidden',
+        background.fixed
+          ? // 固定背景刻意不用 inset-0：那样高度取自动态视口，手机滚动时地址栏
+            // 一收一放，这层就跟着改高度，object-cover 的背景图随之反复缩放，
+            // 表现为滑动时背景抽动。h-stable-viewport 锚定大视口，滚动时不变。
+            // 具体原委见 globals.css 里该工具类的注释。
+            'fixed top-0 left-0 h-stable-viewport w-full'
+          : 'absolute inset-0',
       )}
     >
       {/* 1. 背景图（随机） */}

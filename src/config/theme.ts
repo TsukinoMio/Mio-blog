@@ -14,7 +14,14 @@ export const themeConfig = {
     imageOpacity: 0.55,
     /** 背景图模糊半径（px），0 表示不模糊 */
     imageBlur: 0,
-    /** 背景是否固定（滚动时不动）。移动端会自动降级为 scroll，避免性能问题 */
+    /**
+     * 背景是否固定（滚动时不动）。
+     * true = position: fixed，false = position: absolute（跟着页面一起滚）。
+     *
+     * 注：这里没有"移动端自动降级"的逻辑（旧注释写过，与代码不符，已更正）。
+     * 手机上曾出现滑动时背景抽动，起因不是 fixed 本身，而是背景层用 inset-0
+     * 取动态视口高度，详见 components/decor/Background.tsx 的注释。
+     */
     fixed: true,
     /** 覆盖在图片之上的遮罩，保证文字始终可读。纯白/中性色，不带任何色相 */
     overlay:
