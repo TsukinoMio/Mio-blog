@@ -45,7 +45,7 @@ export const siteConfig = {
   /** 首页正中央的大字标语（src/components/home/Tagline.tsx） */
   homeSlogan: 'これからも アイドル!!!!!!',
   /** 站点描述（SEO，会进搜索结果和分享卡片，写一句完整的话效果最好） */
-  description: 'ReikaAkane',
+  description: 'ReikaAkane的知识小屋',
   /**
    * 线上地址，用于 sitemap 和分享卡片的图片链接。
    *
