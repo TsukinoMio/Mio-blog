@@ -120,19 +120,22 @@ $$
 
 ## 换背景图
 
-1. 把图片放进 `public/images/backgrounds/`
-2. 改 `src/config/theme.ts`：
+**把图片丢进 `public/images/backgrounds/` 就完事了，不用改任何配置。**
+
+和换音乐一样由 `scripts/sync-media.mjs` 自动扫描，产出 `src/data/backgrounds.json`（**生成的文件，别手改**）。支持 jpg / jpeg / png / webp / avif / gif。
+
+每次进入页面会从候选里随机挑一张。目录里**只放一张**就等于固定背景；**清空目录**则只保留渐变、不加载图片。
+
+观感参数仍在 `src/config/theme.ts`：
 
 ```ts
 background: {
-  images: ['/images/backgrounds/a.jpg', '/images/backgrounds/b.png'],  // 候选列表，每次进入页面随机选一张
-  imageOpacity: 0.55,               // 图片太抢眼就调低
+  imageOpacity: 0.55,   // 图片太抢眼就调低
   imageBlur: 0,
-  overlay: '...',                   // 覆盖在图片上的遮罩，保证文字可读；首页不叠加这层
+  fixed: true,          // 滚动时背景不动
+  overlay: '...',       // 覆盖在图片上的遮罩，保证文字可读；首页不叠加这层
 }
 ```
-
-数组里只放一张图就等于固定背景；留空数组则只保留渐变，不加载图片。
 
 同一个文件里还能关掉氛围特效：
 
@@ -169,35 +172,34 @@ icon: '/images/my-icon.png',
 
 ## 主题配色
 
-首页左侧有一个可拖动的色相滑块（`ThemePicker` 组件），拉到最左是纯白，往右拖会连续过渡出颜色，选择存在浏览器 localStorage 里。
+顶栏搜索框右边有个**画板按钮**（`ThemePicker` 组件），点开是一条可拖动的色相滑块：拉到最左是纯白，往右拖会连续过渡出颜色，选择存在浏览器 localStorage 里。每个页面都能调。
 
 全站原本写死的粉紫蓝渐变（按钮、头像光环、卡片辉光）现在都是靠 `src/app/globals.css` 里的一套 `--accent-*` CSS 变量驱动，`ThemeProvider`（`src/providers/ThemeProvider.tsx`）在拖动滑块时用 HSL 现算颜色、直接写成 `<html>` 的内联样式覆盖默认值。想改默认主题色或者滑块的取值范围，改这两个文件。
 
 ## 换音乐
 
-1. 音频文件放进 `public/audio/`
-2. 改 `src/data/music.json`：
+**把 mp3 丢进 `public/audio/` 就完事了，不用改任何配置。**
 
-```json
-{
-  "id": "prelude",
-  "title": "歌名",
-  "artist": "演唱者",
-  "album": "专辑（可选）",
-  "src": "/audio/song.mp3",
-  "duration": 214
-}
+曲名、艺术家、专辑、时长、封面全部从 mp3 自带的 ID3 标签里读。封面会被自动抽成单独的图片文件存到 `public/images/covers/`，页面上显示的就是它。
+
+这件事由 `scripts/sync-media.mjs` 完成，它挂在 `predev` / `prebuild` 上，跑 `npm run dev` 或 `npm run build` 时自动执行，产出 `src/data/music.json`。想手动跑一次：
+
+```bash
+npm run sync:media
 ```
 
-`duration` 可以不写，播放器会在读到音频元数据后自动补上。
+几个注意点：
 
-`src` 直接写外链（`https://...`）也可以。想把整批音频搬到 CDN，不用改 JSON —— 设一个环境变量即可，所有相对路径会自动加前缀：
+- **`src/data/music.json` 是生成的，别手改** —— 下次构建会被覆盖。
+- **mp3 最好带内嵌封面**。没有的话不会报错，播放器会显示渐变占位块，脚本也会在输出里提示有几首缺封面。
+- 曲目顺序按**文件名**排序。想指定顺序就给文件名加前缀，比如 `01 - xxx.mp3`。
+- 曲目 id 由 ID3 标题生成。两首歌标题相同时会自动加 `-2` 后缀，不会撞车。
+
+想把整批音频搬到 CDN，设一个环境变量即可，所有相对路径会自动加前缀：
 
 ```bash
 NEXT_PUBLIC_AUDIO_BASE_URL=https://cdn.example.com
 ```
-
-仓库里自带的三段音频是脚本生成的占位音色，替换掉就行。
 
 音乐没有独立页面 —— 它是常驻左下角的浮动播放条（`FloatingPlayer`），封面、进度、音量、上一首/播放/下一首/循环模式都在条上，点封面或箭头能展开歌曲列表。
 

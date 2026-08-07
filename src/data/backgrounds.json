@@ -1,0 +1,7 @@
+{
+  "_generated": "此文件由 scripts/sync-media.mjs 生成，请勿手改。换背景只需把图片放进 public/images/backgrounds/",
+  "images": [
+    "/images/backgrounds/koroii.jpg",
+    "/images/backgrounds/lovelive.png"
+  ]
+}

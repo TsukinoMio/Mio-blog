@@ -1,15 +1,15 @@
 /**
- * 视觉主题配置 —— 背景图与氛围特效的唯一开关处。
+ * 视觉主题配置 —— 氛围特效与背景观感的开关处。
  *
- * 换背景：把图片放进 public/images/backgrounds/，然后加进下面的 images 数组即可。
- * 每次打开网站会从数组里随机挑一张（客户端随机，所以每次刷新都可能不一样）。
- * 数组里只放一张就等于固定背景；留空数组则只保留渐变，不加载图片。
+ * 【换背景不用改这个文件】
+ * 把图片丢进 public/images/backgrounds/ 就行，构建前 scripts/sync-media.mjs
+ * 会自动扫描该目录、生成 src/data/backgrounds.json。
+ * 每次打开网站从中随机挑一张（客户端随机，所以每次刷新都可能不一样）；
+ * 只放一张就等于固定背景；目录留空则只保留渐变、不加载图片。
  */
 
 export const themeConfig = {
   background: {
-    /** 候选背景图路径（相对 public/），每次进入页面随机选一张 */
-    images: ['/images/backgrounds/koroii.jpg', '/images/backgrounds/lovelive.png'] as string[],
     /** 背景图不透明度（0~1）。图片太抢眼时调低 */
     imageOpacity: 0.55,
     /** 背景图模糊半径（px），0 表示不模糊 */

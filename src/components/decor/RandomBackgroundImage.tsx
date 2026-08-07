@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { themeConfig } from '@/config/theme';
+import { getBackgroundImages } from '@/lib/backgrounds';
 
 /**
  * 从候选图里随机选一张背景图。
@@ -12,7 +13,9 @@ import { themeConfig } from '@/config/theme';
  * 挂载后选好图立刻淡入，肉眼看不出延迟。
  */
 export function RandomBackgroundImage() {
-  const { images, imageOpacity, imageBlur } = themeConfig.background;
+  const { imageOpacity, imageBlur } = themeConfig.background;
+  // 候选图来自 public/images/backgrounds/ 的自动扫描结果，不再写在配置里
+  const images = getBackgroundImages();
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {

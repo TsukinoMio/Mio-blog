@@ -3,7 +3,6 @@ import { Background } from '@/components/decor/Background';
 import { Footer } from '@/components/layout/Footer';
 import { Header } from '@/components/layout/Header';
 import { FloatingPlayer } from '@/components/music/FloatingPlayer';
-import { ThemePicker } from '@/components/theme/ThemePicker';
 import { siteConfig } from '@/config/site';
 import { getPlaylist } from '@/lib/music';
 import { PlayerProvider } from '@/providers/PlayerProvider';
@@ -68,8 +67,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Header />
             <main className="flex-1">{children}</main>
             <Footer />
+            {/* 主题配色不在这里 —— 它已收进 Header（搜索框右边的画板按钮） */}
             <FloatingPlayer />
-            <ThemePicker />
           </PlayerProvider>
         </ThemeProvider>
       </body>

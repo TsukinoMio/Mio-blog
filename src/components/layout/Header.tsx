@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 import { SearchBox } from '@/components/layout/SearchBox';
+import { ThemePicker } from '@/components/theme/ThemePicker';
 import { copy } from '@/config/copy';
 import { siteConfig } from '@/config/site';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,9 @@ export function Header() {
 
           {/* 搜索：紧挨在导航（最后一项是"关于"）右边 */}
           <SearchBox />
+
+          {/* 主题配色：搜索右边的画板按钮 */}
+          <ThemePicker />
 
           {/* 移动端开关 */}
           <button
