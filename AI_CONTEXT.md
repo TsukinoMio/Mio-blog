@@ -7,6 +7,7 @@
 > **线上**：`https://blog.reikaakane.com`（Cloudflare Workers，push 到 main 自动部署）
 > **当前 HEAD**：`fab8b9d`
 > **校验状态**：`npm run typecheck` ✅ / `npm run lint` ✅ / `npm run build` ✅（12 个路由全部预渲染）
+> **线上状态**：全站可访问；移动端背景抽动已由站主真机确认修复
 >
 > **文档分工**（四份，内容不重复）：
 > - **本文件** —— 给 AI 看：架构决策、技术债、待办
@@ -543,7 +544,10 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 
 **没写 `100vh` 兜底**：Tailwind v4 的浏览器基线本就是 Safari 16.4+ / Chrome 111+，而 `lvh` 在 Safari 15.4 / Chrome 108 起就支持。试过写两条声明做渐进增强，Lightning CSS 会按浏览器目标判定 `vh` 那条冗余并直接删掉，产物里只剩 `lvh`。
 
-> **此修复未在真机验证**（无头浏览器没有可收起的工具栏，`lvh` 等同窗口高度，改窗口大小时新旧写法表现一致）。站主需在手机上确认。
+> **已由站主在真机确认修复生效**（2026-08-07）。
+> 当时无法在开发机复现：无头浏览器没有可收起的工具栏，`lvh` 等同窗口高度，
+> 改窗口大小时新旧两种写法表现完全一致 —— 这类"只在真机成立"的问题，
+> 本地能做的只有机制推导 + 结构验证，最终必须靠站主实测。
 
 ### ADR-13：不可换行的文本要用流体字号
 
@@ -622,11 +626,12 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 
 无。代码库 typecheck / lint / build 全部通过，线上全站可访问。
 
-### P1（需要站主提供信息 / 需要真机确认）
+### P1（需要站主提供信息）
 
-1. **背景抽动修复未在真机验证**（ADR-12）。无头浏览器复现不了手机地址栏收放。**请站主在手机上滑动确认**。若仍抽动，下一步排查方向是光晕（`animate-float`，三个 24~30rem 的 `blur-3xl` 色球）和星光（60 个点做透明度动画）这两层 —— 可临时在 `src/config/theme.ts` 把 `effects.starfield` / `glowOrbs` 单独关掉定位。
-2. **社交链接只剩 B 站**。X / GitHub / Email 已在 `src/config/site.ts` 注释掉。拿到真实地址取消注释即可。**绝不要编占位值**。
-3. **`www` 子域未绑定**。只有 `blog.reikaakane.com` 能开。
+1. **社交链接只剩 B 站**。X / GitHub / Email 已在 `src/config/site.ts` 注释掉。拿到真实地址取消注释即可。**绝不要编占位值**。
+2. **`www` 子域未绑定**。只有 `blog.reikaakane.com` 能开。
+
+> **已关闭**：手机滑动时背景抽动 —— 站主 2026-08-07 真机确认修复生效（见 ADR-12）。
 
 ### P2（可选打磨）
 
