@@ -1,7 +1,7 @@
 # AI 开发上下文文档 — ReikaAkane 个人网站
 
 > 本文档面向 AI 助手，用于在新对话中快速接手本项目。
-> **最后更新**：2026-08-06（上线当天），基于代码库实际状态扫描 + 线上实测生成。
+> **最后更新**：2026-08-07（体验优化轮），基于代码库实际状态扫描 + 线上实测生成。
 > **项目路径**：`C:\Users\Hikami\Desktop\personalWeb`
 > **仓库**：`https://github.com/TsukinoMio/Mio-blog`，只用 `main` 一个分支
 > **线上**：`https://blog.reikaakane.com`（Cloudflare Workers，push 到 main 自动部署）
@@ -33,7 +33,7 @@
 | 文章详情（MDX + KaTeX 数学公式 + Shiki 代码高亮 + 目录 + 上下篇 + 相关文章） | ✅ |
 | 关于页（头像 + 自我介绍 + 社交链接卡片） | ✅ |
 | 音乐播放器（左下角浮动，跨页面不中断，自动播放，专辑封面同步旋转） | ✅ |
-| 主题配色（首页左侧色相滑块，实时改全站强调色） | ✅ |
+| 主题配色（顶栏搜索框右边的画板按钮，全站可用，实时改强调色） | ✅ |
 | 全文搜索（顶部放大镜，模糊匹配，多命中，点击跳转到具体句子） | ✅ |
 | 随机背景图 | ✅ |
 | SEO（metadata / sitemap / robots / JSON-LD） | ✅ |
@@ -84,7 +84,8 @@
 | 部署 CLI | wrangler | 4.119 |
 | 运行时 | **标准 Next.js 运行时**（刻意不用 `output: 'export'`） | — |
 
-**dev 依赖里的 `music-metadata`** 只被 `scripts/extract-audio-covers.mjs` 使用（从 mp3 的 ID3 标签里提取专辑封面），不参与构建。
+**dev 依赖里的 `music-metadata`** 被 `scripts/sync-media.mjs` 使用（读 mp3 的 ID3 标签生成歌单、抽出内嵌封面）。
+**它参与构建** —— 那个脚本挂在 `prebuild` 上，CI 也会跑，所以不能因为"只是个脚本依赖"就删掉。
 
 **`@shikijs/langs` / `@shikijs/themes` 是显式 `dependencies`**，不要以为它们是 shiki 的传递依赖就删掉 —— `src/lib/shiki.ts` 直接 import 它们的子路径。
 
@@ -106,15 +107,18 @@ personalWeb/
 │   ├── headimg/、*.jpg/png  ← 原始图片素材
 ├── content/blog/*.mdx       ← 【高频修改】文章，与 src 同级，方便单独备份
 ├── public/
-│   ├── audio/*.mp3          ← 音乐文件（文件名含空格，JSON 里要 URL 编码）
+│   ├── _headers             ← Workers Assets 的缓存头（/images/* 与构建产物）
+│   ├── audio/*.mp3          ← 【丢文件即可】歌单由 ID3 自动生成，不用改配置
 │   ├── images/avatar.jpg
-│   ├── images/backgrounds/  ← 随机背景图候选
-│   ├── images/covers/       ← 专辑封面（脚本从 mp3 提取）
+│   ├── images/my-icon.png   ← favicon，路径写在 siteConfig.icon
+│   ├── images/backgrounds/  ← 【丢文件即可】背景图候选，自动扫描
+│   ├── images/covers/       ← 专辑封面（由 sync-media 从 mp3 自动抽出，不要手放）
 │   └── images/blog/<slug>/  ← 文章配图，按 slug 分目录
-├── scripts/extract-audio-covers.mjs  ← 一次性工具：提取 mp3 内嵌封面
+├── scripts/sync-media.mjs   ← 【构建前自动跑】扫描 audio/ 与 backgrounds/，
+│                                生成 src/data/music.json、backgrounds.json，抽封面
 └── src/
     ├── app/
-    │   ├── layout.tsx        ← 根布局：Background + 两个 Provider + Header/Footer + 两个浮动面板
+    │   ├── layout.tsx        ← 根布局：Background + 两个 Provider + Header/Footer + 浮动播放器
     │   ├── page.tsx          ← 首页
     │   ├── globals.css       ← 【重要】设计 token + accent 变量 + MDX 排版 + 动画
     │   ├── about/page.tsx
@@ -126,16 +130,16 @@ personalWeb/
     │   │     放回 src/app/icon.* 会被 Next 文件约定接管，让配置失效）
     ├── components/
     │   ├── ui/          Container · GlassCard · Badge（视觉基元）
-    │   ├── layout/      Header · Footer · SearchBox
+    │   ├── layout/      Header（内含 SearchBox 与 ThemePicker）· Footer · SearchBox
     │   ├── decor/       Background · RandomBackgroundImage · OverlayGradient · Starfield
     │   ├── home/        Hero · Tagline · LatestPosts
     │   ├── blog/        PostCard · PostFilter · PostHeader · MDXContent · ArticleToc · SearchHighlighter
     │   ├── music/       FloatingPlayer · TrackList
-    │   ├── theme/       ThemePicker
+    │   ├── theme/       ThemePicker（挂在 Header 里，不在 layout.tsx）
     │   └── about/       SocialLinks · SocialIcons
     ├── config/          【高频修改】site.ts · theme.ts · copy.ts
-    ├── data/            【高频修改】music.json · profile.json
-    ├── lib/             posts.ts · search.ts · toc.ts · music.ts · profile.ts · schema.ts · utils.ts · mdx-components.tsx · shiki.ts
+    ├── data/            profile.json（手改）· music.json / backgrounds.json（**自动生成，别手改**）
+    ├── lib/             posts.ts · search.ts · toc.ts · music.ts · backgrounds.ts · profile.ts · schema.ts · utils.ts · mdx-components.tsx · shiki.ts
     ├── hooks/           useDiscSpin.ts · useMediaQuery.ts
     └── providers/       PlayerProvider.tsx · ThemeProvider.tsx
 ```
@@ -147,7 +151,9 @@ personalWeb/
 | `src/lib/posts.ts` | **全站唯一读取文件系统的地方** | 所有页面只调用它，绝不直接 `fs` |
 | `src/config/site.ts` | 站点身份：名字、标语、导航、社交链接、播放器行为 | 高频改 |
 | `src/config/copy.ts` | **全站界面文案**（按页面/功能分 9 组） | 改文案只改这里 |
-| `src/config/theme.ts` | 背景图候选、氛围特效开关 | |
+| `src/config/theme.ts` | 背景的**观感参数**（透明度/模糊/遮罩/是否固定）、氛围特效开关 | 背景图列表已不在这里 |
+| `scripts/sync-media.mjs` | 扫 `public/audio/` 与 `public/images/backgrounds/`，生成两份 JSON 并抽封面 | 挂 `predev`/`prebuild` 自动跑 |
+| `src/lib/backgrounds.ts` | 背景图数据层，读生成的 `backgrounds.json` | 组件不直接 import JSON |
 | `src/app/globals.css` | 设计 token（`@theme`）+ `--accent-*` 运行时变量 + `.mdx-body` 排版 | 改视觉基调看这里 |
 | `src/lib/search.ts` | 搜索纯逻辑（无 fs / 无 Fuse 依赖），服务端客户端共用 | |
 | `src/lib/toc.ts` | 从 MDX 抽标题生成目录，id 用 github-slugger 与 rehype-slug 对齐 | |
@@ -160,8 +166,12 @@ personalWeb/
 1. `content/blog/*.mdx` — 加文章
 2. `src/config/site.ts` — 改身份信息
 3. `src/config/copy.ts` — 改界面文字
-4. `src/data/music.json` / `profile.json` — 改歌单 / 自我介绍
-5. `src/config/theme.ts` — 换背景
+4. `src/data/profile.json` — 改自我介绍
+
+**换歌 / 换背景不改任何文件** —— 把 mp3 丢进 `public/audio/`、把图片丢进
+`public/images/backgrounds/` 即可，`scripts/sync-media.mjs` 会在构建前自动生成
+`src/data/music.json` 与 `src/data/backgrounds.json`。这两份 JSON 是生成物，
+**手改会在下次构建被覆盖**。
 
 ---
 
@@ -231,11 +241,13 @@ personalWeb/
 ### 页面布局规则
 
 - Header 吸顶（`sticky top-0 z-50`），滚动超过 12px 才出现毛玻璃底
-- **三个浮动面板，z-40，互不重叠**：
+- **两个浮动面板，z-40，互不重叠**：
   - 左下 `bottom-4 left-4`：音乐播放器（全站）
-  - 左中 `top-1/2 left-4`：主题配色（**仅首页**）
   - 右中：文章目录（**仅文章页**）。≥1280px 时贴正文右缘 `left-[calc(50%+23.25rem)]` 常驻展开；<1280px 退回 `right-4` 圆钮点开式
-- 三个面板交互一致：**点开 / 点面板外收起**
+- **主题配色不再是浮动面板** —— 已收进 Header，是搜索框右边的画板按钮，点开为下拉面板
+- 以上面板交互一致：**点开 / 点面板外收起**（主题面板还支持 Esc）
+- Header 里的两个下拉面板（搜索结果、主题配色）在窄屏都改成
+  `max-sm:fixed inset-x-4 top-[4.5rem]` 相对视口铺开 —— 按 `right-0` 定位会被汉堡菜单顶出屏幕
 
 ---
 
@@ -338,16 +350,19 @@ Container(narrow) > GlassCard > MDXContent
 
 **只有一个滚动条**（结果面板整体）。刻意不做嵌套滚动：触屏上内外两层滚动很难操作。
 
-**小节划分怎么来的**（`buildSearchContent`）：在原文标题行**末尾**打一个 ` ` 记号，跟正文一起过一遍 `markdownToPlainText`，再从结果里找记号位置。这样偏移量天然是 `content` 里的真实下标，不用把清洗逻辑抄第二遍。
+**小节划分怎么来的**（`buildSearchContent`）：在原文标题行**末尾**打一个 `NUL` 记号，跟正文一起过一遍 `markdownToPlainText`，再从结果里找记号位置。这样偏移量天然是 `content` 里的真实下标，不用把清洗逻辑抄第二遍。
 **记号必须打在行尾**——打在行首或井号后面会挡住 `markdownToPlainText` 里那些 `^` 锚定的规则（剥井号、剥有序列表 `1. ` 等），导致 `content` 与改动前对不上。实测踩过：`### 1. 标题` 会残留成 `1. 标题`。
 
 **关键对齐机制**：为了让"第 i 处"在索引和 DOM 里指同一处，**两边都跳过代码块和公式** —— 索引侧在 `markdownToPlainText` 剔除，页面侧跳过 `pre` 和 `.katex`。行内公式也是整段剔除（不是只去 `$`），因为 KaTeX 渲染后的 DOM 文字对不上。**改动任一侧时必须同步改另一侧**。
 
 ---
 
-### 主题配色（首页浮动） — ✅ 完成
+### 主题配色（顶栏画板按钮） — ✅ 完成
 
-首页左侧色相滑块（0=纯白，1~100 映射 0~360°）。`ThemeProvider` 用 HSL 现算出整套 `--accent-*` 写进 `<html>` 内联样式。选择存 `localStorage` 的 `theme-hue`。
+Header 里搜索框右边的画板按钮，点开是下拉面板，里面是色相滑块（0=纯白，1~100 映射 0~360°）。
+`ThemeProvider` 用 HSL 现算出整套 `--accent-*` 写进 `<html>` 内联样式。选择存 `localStorage` 的 `theme-hue`。
+
+**曾经是首页左侧的浮动圆钮**（只在首页出现，且与左下角播放器抢空间），已收进 Header，现在全站可用。不要挪回去。
 
 ---
 
@@ -454,6 +469,33 @@ serve prerendered data* —— 正是本站情况。它从 Workers Assets 读预
 **快速判断线上是不是又犯了这个病**：打开 `/sitemap.xml`，如果 `<lastmod>` 等于你
 **当前访问的时刻**而不是构建时刻，就说明在实时渲染，没走预渲染产物。
 
+### ADR-9：媒体资源用构建前脚本扫描，**不要改回手写配置**
+
+站主的要求是"丢文件进目录就行，不想改 config"。所以：
+
+```
+public/audio/*.mp3          -> src/data/music.json + public/images/covers/*
+public/images/backgrounds/* -> src/data/backgrounds.json
+```
+
+由 `scripts/sync-media.mjs` 完成，挂在 `predev` / `prebuild` 上自动执行。
+歌曲的曲名 / 艺术家 / 专辑 / 时长 / 封面**全部来自 mp3 的 ID3 标签**。
+
+**为什么是构建前的独立脚本，而不是在 `src/lib/` 里读文件系统**（像 `posts.ts` 那样）：
+抽出来的封面必须**写进 `public/`**，而这要赶在 `next build` 收集静态资源**之前**完成。
+放进构建过程里做，写入时机与资源收集时机的先后没有保证。挂 `prebuild` 由 npm 保证顺序。
+
+**几条不要破坏的纪律：**
+1. `src/data/music.json` 和 `src/data/backgrounds.json` 是**生成物**。
+   手改会在下次构建被覆盖 —— 要改行为就改脚本。
+2. 曲目 `id` 由 ID3 标题生成，**同时用作 React 列表 key 和封面文件名**，必须唯一。
+   脚本里有撞车加 `-2` 后缀的逻辑，别删（实测踩过：复制一首同名歌进去，
+   两条记录 id 相同，列表 key 重复且封面互相覆盖）。
+3. **mp3 要保留内嵌封面。** 曾为省体积用 ffmpeg 的 `-vn` 剥掉过，
+   结果自动识别拿不到图。重转时要用 `-map 0 -c:v copy` 把封面流带上，
+   代价是每首多 0.2~0.6 MB，这是这套工作流的必要成本。
+4. `music-metadata` 虽然在 devDependencies 里，但**参与构建**（CI 也要跑这个脚本），不能当成可有可无的工具依赖删掉。
+
 ### 已删除 / 明确不要重新引入的功能
 
 | 功能 | 为什么删 |
@@ -533,6 +575,20 @@ serve prerendered data* —— 正是本站情况。它从 Workers Assets 读预
    都是「客户端专属状态恢复」的合理场景（`localStorage` 读取、`Math.random()` 选图），
    服务端算不了、必须挂载后才能拿到值，注释里都写明了原因。
    代价只是一次额外渲染，**属于合理取舍，不建议为了消掉告警而增加代码复杂度**。
+
+### 已修复（2026-08-07 体验优化轮）
+
+| 原问题 | 怎么修的 |
+|---|---|
+| 主题配色只在首页、且占着屏幕左侧 | 收进 Header 做成搜索框右边的画板按钮，全站可用（见 §5） |
+| 加歌要手写 `music.json` 并单独处理封面 | `scripts/sync-media.mjs` 从 ID3 自动生成歌单 + 抽封面（见 ADR-9） |
+| 换背景要手改 `theme.ts` 的 `images` 数组 | 同一个脚本自动扫描 `public/images/backgrounds/`（见 ADR-9） |
+| 音频 320 kbps / 35.12 MB，首次加载极慢 | 重编码为 128 kbps，13.64 MB（省 61%）。后因自动识别需要封面，重转时带回内嵌封面，最终 14.66 MB |
+| 手机上站点名 `ReikaAkane` 被切掉 | 单词不含空格无法折行，改用 `clamp(1.75rem,8vw,2.25rem)` + 缩小头像与间距 |
+| 手机滑动时背景抽动 | `fixed inset-0` 的高度取自动态视口，改用 `h-stable-viewport`（`100lvh`）（见 §4） |
+| 静态资源无缓存（`max-age=0`） | 新增 `public/_headers` |
+| 自动播放被拦下后失败一次就永久失效 | 手势解锁改为"播起来才注销监听"，并新增 `canplay` 补播 |
+| `AI_CONTEXT.md` 混入一个裸 NUL 字节，git 当二进制处理、diff 显示不出来 | 写文档描述控制字符时不要真的插入该字符，已换成 `NUL` 三个字母 |
 
 ### 已修复（2026-08-06 上线轮）
 
@@ -619,7 +675,8 @@ npm run lint       # ESLint
 npm run cf:build   # Cloudflare 部署用的构建（CI 跑的就是这条）
 npm run cf:preview # 本地 workerd 预览 —— 站主的 Windows 机器上跑不了，见 P2-7
 npm run cf:deploy  # 手动部署（正常走 git push 自动部署，一般用不到）
-node scripts/extract-audio-covers.mjs   # 从 public/audio/ 的 mp3 提取内嵌专辑封面
+npm run sync:media # 手动扫描 audio/ 与 backgrounds/ 重新生成两份 JSON
+                   # （predev / prebuild 会自动跑，平时不用手动执行）
 ```
 
 线上自检（部署后确认）：
@@ -629,6 +686,9 @@ curl -s -o /dev/null -w "%{http_code}\n" https://blog.reikaakane.com/blog/physic
 ```
 
 ## 附录：新增一篇文章的完整流程
+
+> 加歌 / 换背景不在这里 —— 直接把 mp3 丢进 `public/audio/`、
+> 把图片丢进 `public/images/backgrounds/` 即可，无需任何配置（见 ADR-9）。
 
 1. 在 `content/blog/` 建 `my-post.mdx`（文件名即 URL）
 2. 写 frontmatter：`title` / `date` / `summary` / `category` / `tags` 必填，`cover` / `draft` / `slug` 可选（由 `src/lib/schema.ts` 的 zod 校验，写错构建期直接报错）
