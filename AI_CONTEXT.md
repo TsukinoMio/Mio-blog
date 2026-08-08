@@ -1,13 +1,23 @@
 # AI 开发上下文文档 — ReikaAkane 个人网站
 
 > 本文档面向 AI 助手，用于在新对话中快速接手本项目。
-> **生成方式**：2026-08-07 基于代码库**实际扫描**生成（非聊天记忆）。
+> **生成方式**：2026-08-07 基于代码库**实际扫描**生成（非聊天记忆）；2026-08-09 更新。
 > **项目路径**：`C:\Users\Hikami\Desktop\personalWeb`
 > **仓库**：`https://github.com/TsukinoMio/Mio-blog`，只用 `main` 一个分支
-> **线上**：`https://blog.reikaakane.com`（Cloudflare Workers，push 到 main 自动部署）
-> **当前 HEAD**：`fab8b9d`
-> **校验状态**：`npm run typecheck` ✅ / `npm run lint` ✅ / `npm run build` ✅（12 个路由全部预渲染）
-> **线上状态**：全站可访问；移动端背景抽动已由站主真机确认修复
+> **线上**：`https://reikaakane.com`（**根域**，Cloudflare Workers，push 到 main 自动部署）
+> **当前 HEAD**：`068b9a2`
+> **校验状态**：`npm run typecheck` ✅ / `npm run lint` ✅ / `npm run build` ✅（**9 个路由**全部预渲染）
+> **线上状态**：全站可访问，已实测（见下面「线上自检结果」）；移动端背景抽动已由站主真机确认修复
+>
+> ### 2026-08-09 的三处变更（新会话必读）
+>
+> 1. **域名从子域换成根域**：`blog.reikaakane.com` 已被站主删除，其 DNS 记录在
+>    Cloudflare 权威 NS 上返回 **NXDOMAIN**，现在只有 `reikaakane.com` 能打开。
+>    ⚠️ **构建变量 `NEXT_PUBLIC_SITE_URL` 还是旧值**，导致线上 sitemap / robots / og:url
+>    仍指向死域名 —— 见第 8 节 P0。
+> 2. **删掉了 3 篇 AI 示例文章**（`hello-world` / `rsc-notes` / `stage-lights`，提交 `068b9a2`）。
+>    现在**只剩 1 篇** `physically-based-rendering`。
+> 3. **给 git 配了全局代理**，因为不配就推不上去 —— 见第 7 节「站主的环境限制」。
 >
 > **文档分工**（四份，内容不重复）：
 > - **本文件** —— 给 AI 看：架构决策、技术债、待办
@@ -47,15 +57,15 @@
 | 文案全量可配置（`src/config/copy.ts`，10 个分组） | ✅ |
 | git + GitHub（单 `main` 分支） | ✅ |
 | Cloudflare Workers 部署（push 即自动构建上线） | ✅ |
-| 自定义域名 `blog.reikaakane.com` | ✅ |
+| 自定义域名 `reikaakane.com`（根域） | ✅ |
 | **媒体自动同步**（丢 mp3/图片进目录即可，无需改配置） | ✅ |
 | 静态资源缓存头（`public/_headers`） | ✅ |
 
 ### 未完成内容
 
 - **社交链接只有 B 站是真的**。X / GitHub / Email 在 `src/config/site.ts` 的 `social` 数组里注释着，拿到真实地址取消注释即可。**绝不要编占位地址**。
-- **只有 4 篇文章**，其中 3 篇（`hello-world` / `rsc-notes` / `stage-lights`）是 AI 写的示例内容，只有 `physically-based-rendering` 是站主的真实笔记。
-- **`www` 子域未绑定**，只有 `blog.reikaakane.com` 能打开。
+- **只剩 1 篇文章** `physically-based-rendering`（站主的真实笔记）。3 篇 AI 示例内容已于 2026-08-09 删除（提交 `068b9a2`）。**内容填充是当前最主要的缺口。**
+- **`www` 子域未绑定**，`blog` 子域已删除。只有根域 `reikaakane.com` 能打开。
 - **图床尚未接入**。站主正在自建图床，计划以后所有**文章配图**从图床加载（背景图经分析后决定留本地，见 ADR-10）。
 - `MioSrc/BugReport/` 下有一份历史构建失败日志，已入库。
 
@@ -67,8 +77,29 @@
 | **构建命令** | **`npm run cf:build`** —— 改成 `npm run build` 必然失败 |
 | 部署命令 | `npx wrangler deploy` |
 | 非生产分支部署命令 | `npx wrangler versions upload` |
-| 构建变量 | `NEXT_PUBLIC_SITE_URL` = `https://blog.reikaakane.com` |
+| 构建变量 | `NEXT_PUBLIC_SITE_URL` 应为 `https://reikaakane.com`（**线上当前仍是旧的子域值，待站主修改**，见 P0） |
+| 自定义域名 | `reikaakane.com`（根域，Domains & Routes） |
 | Worker 绑定 | 只有 `ASSETS` 和 `IMAGES` |
+
+**换域名的完整清单**（2026-08-09 踩过）：改 Cloudflare 自定义域名**只是第一步**，
+必须同时改构建变量 `NEXT_PUBLIC_SITE_URL` 并重新构建。因为带 `NEXT_PUBLIC_` 前缀的值
+在 `next build` 时就被内联进产物，只改运行时变量不生效。漏掉的表现极具迷惑性：
+**页面完全正常，只有 `sitemap.xml` 的 `<loc>`、`robots.txt` 的 `Sitemap:` 行和 `og:url`
+还指着旧域名**，肉眼浏览发现不了。仓库代码里没有任何硬编码域名，不用改代码。
+
+### 线上自检结果（2026-08-09，直连实测）
+
+| 检查 | 结果 |
+|---|---|
+| `/` `/blog` `/about` `/blog/physically-based-rendering` | 全部 `200` |
+| `/blog/hello-world` `/blog/rsc-notes` `/blog/stage-lights` | 全部 `404`（`dynamicParams = false` 生效） |
+| `/sitemap.xml` | 4 条（3 静态 + 1 文章），`lastmod` = 构建时刻 → ADR-8 缓存正常 |
+| `/search-index.json` | 4932 字节，1 条文档 |
+| `<loc>` / `og:url` / `robots.txt` 的域名 | ❌ 仍是 `blog.reikaakane.com`（见 P0） |
+
+> **自检时必须给 curl 加 `--noproxy '*'`**：实测经站主的 Clash 访问 `reikaakane.com`
+> 会 TLS 握手失败（curl 退出码 35），而同一代理访问 github.com 正常。
+> 不绕过代理的话会把网站误判成挂了 —— **这个坑本次真的踩了一次**。
 
 ---
 
@@ -134,7 +165,7 @@ personalWeb/
 │   ├── 配置系统说明.md
 │   ├── md/基于物理的渲染.md   ← 原始语雀导出稿（已整合进 content/blog/）
 │   └── BugReport/           ← 历史构建失败日志
-├── content/blog/*.mdx       ← 【高频修改】4 篇文章，与 src 同级方便单独备份
+├── content/blog/*.mdx       ← 【高频修改】当前 1 篇，与 src 同级方便单独备份
 ├── public/
 │   ├── _headers             ← Workers Assets 缓存头（/_next/static 一年 immutable，/images/* 与 /audio/* 30 天）
 │   ├── audio/*.mp3          ← 【丢文件即可】3 首，14.66 MB，128 kbps，**带内嵌封面**
@@ -314,7 +345,7 @@ personalWeb/
 
 `PostFilter` 接收全部 `PostMeta`，在客户端做分类 + 标签筛选。卡片切换筛选时 key 带筛选条件，重新触发入场动画。
 
-**已知取舍**：没有分页、没有 `/blog/category/[x]` 路由（刻意简化，4 篇文章不值得）。
+**已知取舍**：没有分页、没有 `/blog/category/[x]` 路由（刻意简化，个位数文章不值得）。
 
 ---
 
@@ -610,6 +641,35 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 - **未开启开发者模式**，`npm run cf:preview` 跑不了（OpenNext 打包要创建符号链接，报 `EPERM`）。**这意味着 AI 无法在本地验证 OpenNext 最终产物和 gzip 体积**，只能靠 CI 或线上实测
 - ffmpeg 装在 `D:\Tools\ffmpeg\bin\ffmpeg.exe`（gyan.dev essentials 构建，含 `libmp3lame` 和 `ffprobe`）
 - **`gh` CLI 未安装**，无法从命令行开 PR
+- **走 Clash 代理，端口 `127.0.0.1:7897`**。GitHub 直连不通（实测 21 秒超时 `Could not connect to server`）
+
+#### git 代理（2026-08-09 配好，别再重复排查）
+
+**Clash 的「系统代理」只写进 Windows 的 WinINET 注册表，Git for Windows 自带的 curl 不读它。**
+git 只认 `http.proxy` / `https.proxy` 配置或 `HTTP_PROXY` / `HTTPS_PROXY` 环境变量。
+当时站主两样都没有，于是**浏览器能开 GitHub、git 却稳定连不上**，看起来像"网络时好时坏"。
+
+已写进全局 `~/.gitconfig`：
+
+```
+[http]
+	version = HTTP/1.1     ← 这条是更早之前躲 HTTP/2 报错加的，与代理无关
+	proxy = http://127.0.0.1:7897
+[https]
+	proxy = http://127.0.0.1:7897
+```
+
+**已实测有效**：清空 shell 里的 `HTTP_PROXY` / `HTTPS_PROXY` 环境变量后，
+只靠这份配置 `git ls-remote origin` 依然返回 `0` —— 说明在站主自己的终端里同样管用。
+
+**副作用**：Clash 关掉之后 git 会反过来报 `Connection refused`。
+清掉的命令、临时用一次的写法、以及怎么确认问题真出在代理，
+都写在 `更新与发布.md` 第 5.5 节。
+
+> **给 AI 的注意事项**：AI 的 shell 进程环境里往往**已经继承了 `HTTP_PROXY`**，
+> 所以 AI 这边 git 能通不代表站主的终端能通。判断站主环境时要看
+> `git config --global --get-regexp proxy` 和 `HKCU:\Environment`，**不要看自己 shell 的环境变量**。
+> 本次就是因为这个差异，站主推不上去而 AI 一次就推成功了。
 
 ### 做决定时应遵循的原则
 
@@ -624,25 +684,53 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 
 ### P0（阻塞性）
 
-无。代码库 typecheck / lint / build 全部通过，线上全站可访问。
+1. **线上 `NEXT_PUBLIC_SITE_URL` 还是已删除的旧域名**，只有站主能在 Cloudflare 控制台改（AI 没有凭证，改不了）。
+
+   **现状实测**（2026-08-09，直连）：
+
+   ```
+   /sitemap.xml   4 条 <loc> 全是 https://blog.reikaakane.com/...
+   /robots.txt    Sitemap: https://blog.reikaakane.com/sitemap.xml
+   /              <meta property="og:url" content="https://blog.reikaakane.com"/>
+   ```
+
+   而 `blog.reikaakane.com` 在 Cloudflare 权威 NS（`anita` / `matt.ns.cloudflare.com`）上
+   已返回 **NXDOMAIN**。也就是说这些地址全是死链。
+
+   **影响**：页面本身完全正常，用户无感；但搜索引擎抓 sitemap 会全军覆没，
+   分享到社交平台的卡片链接点不开。**属于 SEO 层面的静默故障。**
+
+   **解法**：Cloudflare → Workers & Pages → `mio-blog` → Settings → 构建变量，
+   把 `NEXT_PUBLIC_SITE_URL` 改成 `https://reikaakane.com`，然后**重新触发一次构建**
+   （改变量不会自动重建；随便推一个提交，或在 Deployments 点 Retry）。
+
+   **验证方式**：
+
+   ```bash
+   curl -s --noproxy '*' https://reikaakane.com/robots.txt | grep Sitemap
+   ```
+
+   应该输出 `Sitemap: https://reikaakane.com/sitemap.xml`。
 
 ### P1（需要站主提供信息）
 
 1. **社交链接只剩 B 站**。X / GitHub / Email 已在 `src/config/site.ts` 注释掉。拿到真实地址取消注释即可。**绝不要编占位值**。
-2. **`www` 子域未绑定**。只有 `blog.reikaakane.com` 能开。
+2. **`www` 子域未绑定**，`blog` 子域已删除。只有根域 `reikaakane.com` 能开。
+3. **只剩 1 篇文章**。示例内容已清空，站点内容非常单薄 —— 这是目前最大的实际缺口。
 
 > **已关闭**：手机滑动时背景抽动 —— 站主 2026-08-07 真机确认修复生效（见 ADR-12）。
+> **已关闭**：3 篇 AI 示例文章 —— 站主 2026-08-09 自行删除（提交 `068b9a2`）。
+> **已关闭**：git 推不上去 —— 2026-08-09 配好全局代理，见第 7 节。
 
 ### P2（可选打磨）
 
-4. **`lovelive.png` 是 4.86 MB 的 PNG**。照片类内容用 PNG 很浪费，转 WebP 能降到 1 MB 以内，`next/image` 的每一档也会跟着更小。ffmpeg 已就绪，随时可做。
-5. **3 篇示例文章是 AI 写的占位内容**（hello-world / rsc-notes / stage-lights），站主可自行替换或删除。**删之前要问**。
-6. **音频首次加载仍需 14.66 MB**。已从 320 kbps 降到 128 kbps（35.12 → 13.64 MB），后因自动识别需要封面又带回 1.02 MB。Workers Assets **不支持 Range 请求**（实测发 `Range` 返回 200 全量而非 206），浏览器无法分段取。要再快只剩两条路：搬去支持 Range 的 CDN（`.env.example` 里的 `NEXT_PUBLIC_AUDIO_BASE_URL` 已为此预留），或把 `siteConfig.player.autoplayTrack` 从 `'random'` 改成固定第一首（常客只需缓存一首）。
-7. **点击目标偏小**（站主已表示不用修）：搜索关闭按钮 28×28、页脚社交链接 27×18、首页「ALL →」45×20，均低于 44×44 建议值。
-8. **`public/images/icon.svg` 当前未被引用**（`siteConfig.icon` 指向 `my-icon.png`），作为默认图标示例保留。
-9. **三处 `eslint-disable react-hooks/set-state-in-effect`**（`RandomBackgroundImage` / `PlayerProvider` / `ThemeProvider`）。都是「客户端专属状态恢复」的合理场景，注释里写明了原因。**属于合理取舍，不建议为消警告增加复杂度**。
-10. **搜索索引体积**随文章增长线性上升（当前 4 篇约 18 KB）。涨到几百篇时可考虑改成 `/api/search`（因保留了标准 Next.js 运行时，不用改部署方式）。
-11. **仓库体积**：git 永久保留了音频的历史 blob（320 kbps 那版 35 MB + 128 kbps 那版）。以后换歌尽量一次选定码率再提交，别反复替换同名大文件。
+1. **`lovelive.png` 是 4.86 MB 的 PNG**。照片类内容用 PNG 很浪费，转 WebP 能降到 1 MB 以内，`next/image` 的每一档也会跟着更小。ffmpeg 已就绪，随时可做。
+2. **音频首次加载仍需 14.66 MB**。已从 320 kbps 降到 128 kbps（35.12 → 13.64 MB），后因自动识别需要封面又带回 1.02 MB。Workers Assets **不支持 Range 请求**（实测发 `Range` 返回 200 全量而非 206），浏览器无法分段取。要再快只剩两条路：搬去支持 Range 的 CDN（`.env.example` 里的 `NEXT_PUBLIC_AUDIO_BASE_URL` 已为此预留），或把 `siteConfig.player.autoplayTrack` 从 `'random'` 改成固定第一首（常客只需缓存一首）。
+3. **点击目标偏小**（站主已表示不用修）：搜索关闭按钮 28×28、页脚社交链接 27×18、首页「ALL →」45×20，均低于 44×44 建议值。
+4. **`public/images/icon.svg` 当前未被引用**（`siteConfig.icon` 指向 `my-icon.png`），作为默认图标示例保留。
+5. **三处 `eslint-disable react-hooks/set-state-in-effect`**（`RandomBackgroundImage` / `PlayerProvider` / `ThemeProvider`）。都是「客户端专属状态恢复」的合理场景，注释里写明了原因。**属于合理取舍，不建议为消警告增加复杂度**。
+6. **搜索索引体积**随文章增长线性上升（**当前 1 篇 4932 字节**，此前 4 篇约 18 KB）。涨到几百篇时可考虑改成 `/api/search`（因保留了标准 Next.js 运行时，不用改部署方式）。
+7. **仓库体积**：git 永久保留了音频的历史 blob（320 kbps 那版 35 MB + 128 kbps 那版），以及那 3 篇已删文章的历史版本。以后换歌尽量一次选定码率再提交，别反复替换同名大文件。
 
 ### 图床接入（站主正在自建，尚未开始）
 
@@ -660,7 +748,7 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 请先读取项目根目录的 AI_CONTEXT.md，那是完整的项目交接文档，包含技术栈、
 架构决策记录（ADR-1 ~ ADR-13）、我的偏好要求和当前待办。读完后再动手。
 
-项目已上线：https://blog.reikaakane.com
+项目已上线：https://reikaakane.com（根域，子域 blog.reikaakane.com 已废弃）
 仓库：https://github.com/TsukinoMio/Mio-blog（只有 main 一个分支）
 
 几条硬性约束（详见文档第 6、7 节）：
@@ -713,10 +801,14 @@ npm run cf:preview # 本地 workerd 预览 —— 站主机器上跑不了，见
 线上自检（部署后确认）：
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" https://blog.reikaakane.com/blog/physically-based-rendering
+curl -s -o /dev/null -w "%{http_code}\n" --noproxy '*' https://reikaakane.com/blog/physically-based-rendering
 ```
 
-应返回 `200`。再核对 `/sitemap.xml`（条目数 = 3 + 文章数，且 `lastmod` 应为构建时刻而非访问时刻）和 `/search-index.json`（不应为 `[]`）。
+应返回 `200`。再核对 `/sitemap.xml`（条目数 = 3 + 文章数，`lastmod` 应为构建时刻而非访问时刻，**`<loc>` 的域名应为当前域名**）和 `/search-index.json`（不应为 `[]`）。
+
+> **`--noproxy '*'` 不能省**：站主机器走 Clash，实测经代理访问本站会 TLS 握手失败
+> （curl 退出码 35），容易把网站误判成挂了。而 git 那边**恰恰相反**，必须走代理
+> （见第 7 节）—— 两者要求不同，别搞混。
 
 ## 附录：新增一篇文章的完整流程
 
