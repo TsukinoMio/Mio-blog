@@ -8,8 +8,16 @@ build/
 .wrangler/
 .dev.vars
 
-# 音频重编码的试听候选（几十 MB，只用来对比码率，选定后手动替换 public/audio/）
-MioSrc/audio-reencode/
+# 站主的素材暂存区：只是「方便把文件递给 AI」的中转站，不参与构建，
+# 代码里零引用。原本放在这里的《配置系统说明.md》已移到仓库根目录，
+# 和另外三份文档并列（不用 !例外 的写法，那样规则会变乱）。
+MioSrc/
+
+# Obsidian 库配置。整个忽略，两个原因：
+# 1. 【安全】plugins/cf-imageBed/data.json 里存着图床的 authCode，本仓库是公开仓库
+# 2. 【体积】插件 JS + 主题 CSS 有 2.5 MB 以上（光 Blue Topaz 的 theme.css 就 1.25 MB），
+#    一旦提交就永久留在 git 历史里
+.obsidian/
 
 .DS_Store
 *.pem

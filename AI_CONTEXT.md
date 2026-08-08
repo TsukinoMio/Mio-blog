@@ -23,7 +23,7 @@
 > - **本文件** —— 给 AI 看：架构决策、技术债、待办
 > - **`README.md`** —— 操作手册：怎么写文章 / 换背景 / 换音乐 / 各功能原理
 > - **`更新与发布.md`** —— 发布流程、部署配置、故障排查
-> - **`MioSrc/配置系统说明.md`** —— 速查表：改 XX 去哪个文件
+> - **`配置系统说明.md`** —— 速查表：改 XX 去哪个文件
 
 ---
 
@@ -67,7 +67,7 @@
 - **只剩 1 篇文章** `physically-based-rendering`（站主的真实笔记）。3 篇 AI 示例内容已于 2026-08-09 删除（提交 `068b9a2`）。**内容填充是当前最主要的缺口。**
 - **`www` 子域未绑定**，`blog` 子域已删除。只有根域 `reikaakane.com` 能打开。
 - **图床尚未接入**。站主正在自建图床，计划以后所有**文章配图**从图床加载（背景图经分析后决定留本地，见 ADR-10）。
-- `MioSrc/BugReport/` 下有一份历史构建失败日志，已入库。
+- **`MioSrc/` 与 `.obsidian/` 已移出版本控制**（2026-08-09）。前者是站主递文件给 AI 的中转站，代码零引用；后者含图床凭据且体积大。两者本地都还在，只是不再入库 —— **不要以为它们不存在，也不要试图把它们加回仓库**。详见第 7 节。
 
 ### 部署速查（详见 `更新与发布.md`）
 
@@ -165,11 +165,14 @@ personalWeb/
 ├── next.config.ts           ← 只配了 images.formats（avif/webp）
 ├── .env.example             ← 环境变量模板（域名、音频 CDN，都非必填）
 ├── .claude/launch.json      ← preview_start 用的 dev server 配置（名字 personalWeb，端口 3000）
-├── MioSrc/                  ← 站主的素材暂存区，不参与构建
-│   ├── 配置系统说明.md
+├── 配置系统说明.md           ← 速查表（原在 MioSrc/ 下，随 MioSrc 移出版本控制而挪到根目录）
+├── MioSrc/                  ← 【已 gitignore】站主递文件给 AI 的中转站，不参与构建，代码零引用
+│   ├── blogTemplate/模板.md  ← Obsidian 新建笔记用的模板（frontmatter 空壳）
 │   ├── md/基于物理的渲染.md   ← 原始语雀导出稿（已整合进 content/blog/）
 │   └── BugReport/           ← 历史构建失败日志
-├── content/blog/*.mdx       ← 【高频修改】当前 1 篇，与 src 同级方便单独备份
+├── .obsidian/               ← 【已 gitignore】Obsidian 库配置，含图床凭据，见第 7 节
+├── content/blog/*.md        ← 【高频修改】当前 1 篇，与 src 同级方便单独备份
+│                              （.md 与 .mdx 都收，posts.ts 的过滤是 /\.mdx?$/）
 ├── public/
 │   ├── _headers             ← Workers Assets 缓存头（/_next/static 一年 immutable，/images/* 与 /audio/* 30 天）
 │   ├── audio/*.mp3          ← 【丢文件即可】3 首，14.66 MB，128 kbps，**带内嵌封面**
@@ -646,6 +649,32 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 - ffmpeg 装在 `D:\Tools\ffmpeg\bin\ffmpeg.exe`（gyan.dev essentials 构建，含 `libmp3lame` 和 `ffprobe`）
 - **`gh` CLI 未安装**，无法从命令行开 PR
 - **走 Clash 代理，端口 `127.0.0.1:7897`**。GitHub 直连不通（实测 21 秒超时 `Could not connect to server`）
+
+#### Obsidian 写作工作流（2026-08-09 起）
+
+站主改用 **Obsidian** 管理博客，把项目根目录当成 Obsidian 库。装了三个插件：
+
+| 插件 | 用途 |
+|---|---|
+| `astro-composer-hanhua` | 按模板新建文章（模板在 `MioSrc/blogTemplate/模板.md`） |
+| `cf-imageBed` | 截图直接上传到自建图床 `img.reikaakane.com`，正文里插外链 |
+| `obsidian-git` | 在 Obsidian 里直接提交推送 |
+
+**由此产生的几个事实：**
+
+1. **文章后缀现在是 `.md` 而不是 `.mdx`**（Obsidian 只认 `.md`）。
+   `posts.ts` 的过滤正则是 `/\.mdx?$/`、slug 也用 `replace(/\.mdx?$/,'')`，**两种后缀都支持，不用改代码**。
+   `physically-based-rendering` 已从 `.mdx` 改名为 `.md`，实测新旧内容 401 行、差异 0 行，是纯改名。
+2. **新建的笔记 frontmatter 是空壳**（模板就是空的），**不填完会让 `npm run build` 直接失败**
+   —— zod 校验在草稿过滤之前跑，所以 `draft: true` 也救不了，字段必须合法。
+   写到一半的稿子要么填完，要么挪出 `content/blog/`。
+3. **图床已经在用了**：新截图走 `https://img.reikaakane.com/file/blog/...`。
+   注意 ADR-10 依然成立 —— **背景图不要挪去图床**，只有文章配图适合。
+   PBR 那篇的 14 张配图目前**仍是本地** `public/images/blog/pbr-notes/`，没有迁移。
+4. **`.obsidian/` 已 gitignore**。`plugins/cf-imageBed/data.json` 里存着图床的 `authCode`
+   （非空），而**本仓库是公开仓库**（匿名 `git ls-remote` 可成功，已实测）。
+   加上插件 JS 与主题 CSS 超过 2.5 MB，一旦入库就永久留在 git 历史里。
+   **不要把 `.obsidian/` 加回仓库；如果发现它被跟踪了，那是事故。**
 
 #### git 代理（2026-08-09 配好，别再重复排查）
 
