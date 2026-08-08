@@ -13,6 +13,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { copy } from '@/config/copy';
 import { siteConfig } from '@/config/site';
 import { getAdjacentPosts, getAllSlugs, getPost, getRelatedPosts, type PostMeta } from '@/lib/posts';
+import { toAbsoluteUrl } from '@/lib/utils';
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -81,7 +82,8 @@ export default async function PostPage({ params }: PageProps) {
     datePublished: post.date,
     author: { '@type': 'Person', name: siteConfig.author },
     url: `${siteConfig.url}/blog/${post.slug}`,
-    ...(post.cover ? { image: `${siteConfig.url}${post.cover}` } : {}),
+    // 封面可能是本地相对路径，也可能是图床的绝对地址，不能无脑拼接
+    ...(post.cover ? { image: toAbsoluteUrl(post.cover, siteConfig.url) } : {}),
   };
 
   return (

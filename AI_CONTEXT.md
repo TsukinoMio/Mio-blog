@@ -753,9 +753,38 @@ git 只认 `http.proxy` / `https.proxy` 配置或 `HTTP_PROXY` / `HTTPS_PROXY` �
 6. **搜索索引体积**随文章增长线性上升（**当前 1 篇 4932 字节**，此前 4 篇约 18 KB）。涨到几百篇时可考虑改成 `/api/search`（因保留了标准 Next.js 运行时，不用改部署方式）。
 7. **仓库体积**：git 永久保留了音频的历史 blob（320 kbps 那版 35 MB + 128 kbps 那版），以及那 3 篇已删文章的历史版本。以后换歌尽量一次选定码率再提交，别反复替换同名大文件。
 
-### 图床接入（站主正在自建，尚未开始）
+### 图床接入（2026-08-09 已启用）
 
-计划让**文章配图**从图床加载。建议参考 `lib/music.ts` 的 `resolveAudioSrc` 思路做一个 `resolveImageSrc`，用环境变量控制前缀，这样 MDX 里的相对路径不用改。**背景图不要一起挪**，理由见 ADR-10。
+图床是 `https://img.reikaakane.com`，站主用 Obsidian 的 `cf-imageBed` 插件直接上传截图，
+正文里插的是完整外链。**没有做 `resolveImageSrc` 那套环境变量前缀**（原计划），因为插件
+写进来的本来就是绝对地址，不需要再转换 —— 少一层抽象，符合「不过度工程化」。
+
+**必须知道的三条（都是 2026-08-09 踩出来的）：**
+
+1. **`next.config.ts` 的 `images.remotePatterns` 必须包含图床域名。**
+   `PostCard` / `PostHeader` 的封面和 `mdx-components.tsx` 的 `img` 全都走 `next/image`，
+   不在白名单里的域名，`/_next/image?url=...` 会返回 **400，图全裂**。
+   最坑的是 **`npm run build` 完全不报错**（实测退出码 0、零 error 输出），
+   因为域名校验发生在请求优化接口时，不在构建期。加新图床域名时别忘了这条。
+2. **`cover` 字段必须是纯 URL，不能是 Markdown 图片语法。**
+   从 Obsidian 里复制图片时很容易连 `![alt](url)` 一起粘进去。后果：
+   - dev 下整站 500（连首页都挂，因为 `PostCard` 要渲染它）
+   - **`next build` 却能通过**，产出 `/_next/image?url=![alt](https://...)` 这种废 URL
+   - `og:image` / `twitter:image` / JSON-LD 全部变成拼接出来的乱码地址
+3. **JSON-LD 的 image 不能无脑拼 `siteConfig.url`。**
+   `lib/utils.ts` 的 `toAbsoluteUrl(pathOrUrl, origin)` 负责判断：
+   已经是 `http(s)://` 开头就原样返回，否则才加前缀。
+   本地封面和图床封面现在两种都对（实测：PBR 那篇拼成 `<origin>/images/...`，
+   test01 那篇原样输出图床地址）。
+
+**背景图不要挪去图床**，理由见 ADR-10，那条依然成立。
+PBR 那篇的 14 张配图目前仍是本地 `public/images/blog/pbr-notes/`，没有迁移。
+
+> **尚未验证**：Cloudflare Workers 上的图片优化走的是 `wrangler.jsonc` 里的 `IMAGES` 绑定，
+> 远程图片需要 Worker 去 fetch 图床再优化。这一环**在开发机上验不了**
+> （`cf:preview` 因未开开发者模式报 EPERM）。本地 `next dev` 的优化接口实测
+> 返回 200 / 122 KB，但那是 Node 的实现，与 Workers 的不是同一套。
+> **上线后要人工确认 test01 的封面和正文图真的显示出来了。**
 
 ---
 
