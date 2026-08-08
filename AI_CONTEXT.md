@@ -5,7 +5,7 @@
 > **项目路径**：`C:\Users\Hikami\Desktop\personalWeb`
 > **仓库**：`https://github.com/TsukinoMio/Mio-blog`，只用 `main` 一个分支
 > **线上**：`https://reikaakane.com`（**根域**，Cloudflare Workers，push 到 main 自动部署）
-> **当前 HEAD**：`068b9a2`
+> **当前 HEAD**：以 `git log -1` 为准（最近一次**内容**变更是 `068b9a2`，删除 3 篇示例文章；其后是文档提交）
 > **校验状态**：`npm run typecheck` ✅ / `npm run lint` ✅ / `npm run build` ✅（**9 个路由**全部预渲染）
 > **线上状态**：全站可访问，已实测（见下面「线上自检结果」）；移动端背景抽动已由站主真机确认修复
 >
@@ -13,8 +13,8 @@
 >
 > 1. **域名从子域换成根域**：`blog.reikaakane.com` 已被站主删除，其 DNS 记录在
 >    Cloudflare 权威 NS 上返回 **NXDOMAIN**，现在只有 `reikaakane.com` 能打开。
->    ⚠️ **构建变量 `NEXT_PUBLIC_SITE_URL` 还是旧值**，导致线上 sitemap / robots / og:url
->    仍指向死域名 —— 见第 8 节 P0。
+>    构建变量 `NEXT_PUBLIC_SITE_URL` 已同步改好并重新构建，**线上元数据已全部切换完毕**
+>    （下面「线上自检结果」是切换后的实测）。
 > 2. **删掉了 3 篇 AI 示例文章**（`hello-world` / `rsc-notes` / `stage-lights`，提交 `068b9a2`）。
 >    现在**只剩 1 篇** `physically-based-rendering`。
 > 3. **给 git 配了全局代理**，因为不配就推不上去 —— 见第 7 节「站主的环境限制」。
@@ -77,7 +77,7 @@
 | **构建命令** | **`npm run cf:build`** —— 改成 `npm run build` 必然失败 |
 | 部署命令 | `npx wrangler deploy` |
 | 非生产分支部署命令 | `npx wrangler versions upload` |
-| 构建变量 | `NEXT_PUBLIC_SITE_URL` 应为 `https://reikaakane.com`（**线上当前仍是旧的子域值，待站主修改**，见 P0） |
+| 构建变量 | `NEXT_PUBLIC_SITE_URL` = `https://reikaakane.com`（2026-08-09 已改并重新构建） |
 | 自定义域名 | `reikaakane.com`（根域，Domains & Routes） |
 | Worker 绑定 | 只有 `ASSETS` 和 `IMAGES` |
 
@@ -87,15 +87,19 @@
 **页面完全正常，只有 `sitemap.xml` 的 `<loc>`、`robots.txt` 的 `Sitemap:` 行和 `og:url`
 还指着旧域名**，肉眼浏览发现不了。仓库代码里没有任何硬编码域名，不用改代码。
 
-### 线上自检结果（2026-08-09，直连实测）
+### 线上自检结果（2026-08-09，域名切换后直连实测，提交 `c3fb6f1`）
 
 | 检查 | 结果 |
 |---|---|
 | `/` `/blog` `/about` `/blog/physically-based-rendering` | 全部 `200` |
 | `/blog/hello-world` `/blog/rsc-notes` `/blog/stage-lights` | 全部 `404`（`dynamicParams = false` 生效） |
-| `/sitemap.xml` | 4 条（3 静态 + 1 文章），`lastmod` = 构建时刻 → ADR-8 缓存正常 |
-| `/search-index.json` | 4932 字节，1 条文档 |
-| `<loc>` / `og:url` / `robots.txt` 的域名 | ❌ 仍是 `blog.reikaakane.com`（见 P0） |
+| `/sitemap.xml` | 4 条（3 静态 + 1 文章），`<loc>` 全为 `https://reikaakane.com/...` ✅ |
+| `/robots.txt` | `Sitemap: https://reikaakane.com/sitemap.xml` ✅ |
+| 首页 `og:url` | `https://reikaakane.com` ✅；全页残留旧域名 **0 次** |
+| `/search-index.json` | 4932 字节，1 条文档 `physically-based-rendering` |
+| ADR-8 缓存判定 | `lastmod` 三次访问恒定在 `20:20:07.465Z`，访问时刻从 `20:21:59` 走到 `20:22:09` → **确认走预渲染产物，未实时渲染** |
+
+> 域名切换的生效时间：推送后**约 2 分钟**构建完成并切换（推送 `04:19:xx`，第 4 次轮询 `04:21:00` 见到新域名）。
 
 > **自检时必须给 curl 加 `--noproxy '*'`**：实测经站主的 Clash 访问 `reikaakane.com`
 > 会 TLS 握手失败（curl 退出码 35），而同一代理访问 github.com 正常。
@@ -684,33 +688,20 @@ git 只认 `http.proxy` / `https.proxy` 配置或 `HTTP_PROXY` / `HTTPS_PROXY` �
 
 ### P0（阻塞性）
 
-1. **线上 `NEXT_PUBLIC_SITE_URL` 还是已删除的旧域名**，只有站主能在 Cloudflare 控制台改（AI 没有凭证，改不了）。
+无。代码库 typecheck / lint / build 全部通过，线上全站可访问且元数据域名正确。
 
-   **现状实测**（2026-08-09，直连）：
-
-   ```
-   /sitemap.xml   4 条 <loc> 全是 https://blog.reikaakane.com/...
-   /robots.txt    Sitemap: https://blog.reikaakane.com/sitemap.xml
-   /              <meta property="og:url" content="https://blog.reikaakane.com"/>
-   ```
-
-   而 `blog.reikaakane.com` 在 Cloudflare 权威 NS（`anita` / `matt.ns.cloudflare.com`）上
-   已返回 **NXDOMAIN**。也就是说这些地址全是死链。
-
-   **影响**：页面本身完全正常，用户无感；但搜索引擎抓 sitemap 会全军覆没，
-   分享到社交平台的卡片链接点不开。**属于 SEO 层面的静默故障。**
-
-   **解法**：Cloudflare → Workers & Pages → `mio-blog` → Settings → 构建变量，
-   把 `NEXT_PUBLIC_SITE_URL` 改成 `https://reikaakane.com`，然后**重新触发一次构建**
-   （改变量不会自动重建；随便推一个提交，或在 Deployments 点 Retry）。
-
-   **验证方式**：
-
-   ```bash
-   curl -s --noproxy '*' https://reikaakane.com/robots.txt | grep Sitemap
-   ```
-
-   应该输出 `Sitemap: https://reikaakane.com/sitemap.xml`。
+> **一个值得记住的故障模式（2026-08-09 踩过，已修复）**：换域名时只改了 Cloudflare 的
+> 自定义域名、没改构建变量 `NEXT_PUBLIC_SITE_URL`，结果**页面完全正常、肉眼毫无异常**，
+> 但 `sitemap.xml` 的 `<loc>`、`robots.txt` 的 `Sitemap:` 行和 `og:url` 全都指着已经
+> NXDOMAIN 的旧子域 —— 搜索引擎抓 sitemap 会全军覆没，分享卡片链接点不开。
+> **属于 SEO 层面的静默故障，只能靠主动自检发现。** 自检命令：
+>
+> ```bash
+> curl -s --noproxy '*' https://reikaakane.com/robots.txt | grep Sitemap
+> ```
+>
+> 根因是 `NEXT_PUBLIC_` 前缀的值在 `next build` 时就被内联进产物，
+> 改运行时变量不生效，改完还必须**重新触发一次构建**。
 
 ### P1（需要站主提供信息）
 
@@ -721,6 +712,7 @@ git 只认 `http.proxy` / `https.proxy` 配置或 `HTTP_PROXY` / `HTTPS_PROXY` �
 > **已关闭**：手机滑动时背景抽动 —— 站主 2026-08-07 真机确认修复生效（见 ADR-12）。
 > **已关闭**：3 篇 AI 示例文章 —— 站主 2026-08-09 自行删除（提交 `068b9a2`）。
 > **已关闭**：git 推不上去 —— 2026-08-09 配好全局代理，见第 7 节。
+> **已关闭**：线上元数据指向已删除的旧子域 —— 2026-08-09 改构建变量并重新构建，已实测生效。
 
 ### P2（可选打磨）
 
