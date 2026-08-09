@@ -21,9 +21,13 @@
 >
 > **文档分工**（四份，内容不重复）：
 > - **本文件** —— 给 AI 看：架构决策、技术债、待办
-> - **`README.md`** —— 操作手册：怎么写文章 / 换背景 / 换音乐 / 各功能原理
-> - **`更新与发布.md`** —— 发布流程、部署配置、故障排查
-> - **`配置系统说明.md`** —— 速查表：改 XX 去哪个文件
+> - **`写作指南.md`** —— 给站主：写文章 / frontmatter / cover 与图床 / Obsidian / 换背景换音乐
+> - **`配置与部署.md`** —— 给站主：改 XX 去哪个文件 / 发布流程 / 部署配置 / 故障排查
+> - **`README.md`** —— 项目入口：文档索引、常用命令、目录结构
+>
+> 2026-08-09 重组过一次：原 `更新与发布.md` + `配置系统说明.md` 合并为 `配置与部署.md`，
+> 原 `README.md` 的操作手册部分拆出为 `写作指南.md`，README 瘦成索引。
+> **引用文档时用新名字。**
 
 ---
 
@@ -69,7 +73,7 @@
 - **图床尚未接入**。站主正在自建图床，计划以后所有**文章配图**从图床加载（背景图经分析后决定留本地，见 ADR-10）。
 - **`MioSrc/` 与 `.obsidian/` 已移出版本控制**（2026-08-09）。前者是站主递文件给 AI 的中转站，代码零引用；后者含图床凭据且体积大。两者本地都还在，只是不再入库 —— **不要以为它们不存在，也不要试图把它们加回仓库**。详见第 7 节。
 
-### 部署速查（详见 `更新与发布.md`）
+### 部署速查（详见 `配置与部署.md`）
 
 | 项 | 值 |
 |---|---|
@@ -117,7 +121,7 @@
 | 样式 | **Tailwind CSS v4（CSS-first，无 tailwind.config 文件）** | ^4.3.3 |
 | UI 组件库 | **无第三方组件库**，全部自建 | — |
 | 图标 | lucide-react（B 站/GitHub 品牌图标是手写 SVG） | ^1.28.0 |
-| 内容存储 | **MDX 文件**（`content/blog/*.mdx`）+ 本地 JSON（`src/data/`） | — |
+| 内容存储 | **Markdown 文件**（`content/blog/*.md`，`.mdx` 也收）+ 本地 JSON（`src/data/`） | — |
 | MDX 渲染 | next-mdx-remote（`/rsc` 入口） | ^6.0.0 |
 | 数学公式 | remark-math + rehype-katex + katex | 6 / 7 / 0.18 |
 | 代码高亮 | **@shikijs/rehype/core + 自建精简 highlighter** | 4.4 |
@@ -158,16 +162,16 @@ cf:deploy    opennextjs-cloudflare deploy     手动部署，一般用不到
 ```
 personalWeb/
 ├── AI_CONTEXT.md            ← 本文档（给 AI）
-├── README.md                ← 操作手册
-├── 更新与发布.md             ← 发布流程、部署配置、故障排查
+├── README.md                ← 项目入口：文档索引、常用命令、目录结构
+├── 写作指南.md               ← 给站主：写文章 / cover 与图床 / Obsidian / 换背景换音乐
+├── 配置与部署.md             ← 给站主：改哪个文件 / 发布流程 / 部署配置 / 故障排查
 ├── wrangler.jsonc           ← 【别删】Cloudflare Worker 配置，见 ADR-6
 ├── open-next.config.ts      ← 【别删】OpenNext 适配配置，见 ADR-8
-├── next.config.ts           ← 只配了 images.formats（avif/webp）
+├── next.config.ts           ← images.formats（avif/webp）+ remotePatterns（图床白名单）
 ├── .env.example             ← 环境变量模板（域名、音频 CDN，都非必填）
 ├── .claude/launch.json      ← preview_start 用的 dev server 配置（名字 personalWeb，端口 3000）
-├── 配置系统说明.md           ← 速查表（原在 MioSrc/ 下，随 MioSrc 移出版本控制而挪到根目录）
 ├── MioSrc/                  ← 【已 gitignore】站主递文件给 AI 的中转站，不参与构建，代码零引用
-│   ├── blogTemplate/模板.md  ← Obsidian 新建笔记用的模板（frontmatter 空壳）
+│   ├── blogTemplate/模板.md  ← Obsidian 新建笔记用的模板（已预填占位值 + draft:true）
 │   ├── md/基于物理的渲染.md   ← 原始语雀导出稿（已整合进 content/blog/）
 │   └── BugReport/           ← 历史构建失败日志
 ├── .obsidian/               ← 【已 gitignore】Obsidian 库配置，含图床凭据，见第 7 节
@@ -232,7 +236,7 @@ personalWeb/
 
 ### 经常修改的文件
 
-1. `content/blog/*.mdx` —— 加文章
+1. `content/blog/*.md` —— 加文章
 2. `src/config/site.ts` —— 改身份信息
 3. `src/config/copy.ts` —— 改界面文字
 4. `src/data/profile.json` —— 改自我介绍
@@ -665,9 +669,11 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 1. **文章后缀现在是 `.md` 而不是 `.mdx`**（Obsidian 只认 `.md`）。
    `posts.ts` 的过滤正则是 `/\.mdx?$/`、slug 也用 `replace(/\.mdx?$/,'')`，**两种后缀都支持，不用改代码**。
    `physically-based-rendering` 已从 `.mdx` 改名为 `.md`，实测新旧内容 401 行、差异 0 行，是纯改名。
-2. **新建的笔记 frontmatter 是空壳**（模板就是空的），**不填完会让 `npm run build` 直接失败**
-   —— zod 校验在草稿过滤之前跑，所以 `draft: true` 也救不了，字段必须合法。
-   写到一半的稿子要么填完，要么挪出 `content/blog/`。
+2. **frontmatter 留空会让 `npm run build` 直接失败** —— zod 校验在草稿过滤之前跑，
+   所以 `draft: true` 也救不了，字段必须合法。写到一半的稿子要么填占位值，
+   要么挪出 `content/blog/`。
+   **模板已在 2026-08-09 改成预填占位值 + `draft: true` 的版本**（原来是纯空壳，
+   `test01.md` 就是因此让构建挂过一次），照模板新建不会再踩这个坑。
 3. **图床已经在用了**：新截图走 `https://img.reikaakane.com/file/blog/...`。
    注意 ADR-10 依然成立 —— **背景图不要挪去图床**，只有文章配图适合。
    PBR 那篇的 14 张配图目前**仍是本地** `public/images/blog/pbr-notes/`，没有迁移。
@@ -697,7 +703,7 @@ git 只认 `http.proxy` / `https.proxy` 配置或 `HTTP_PROXY` / `HTTPS_PROXY` �
 
 **副作用**：Clash 关掉之后 git 会反过来报 `Connection refused`。
 清掉的命令、临时用一次的写法、以及怎么确认问题真出在代理，
-都写在 `更新与发布.md` 第 5.5 节。
+都写在 `配置与部署.md` 第 9.5 节。
 
 > **给 AI 的注意事项**：AI 的 shell 进程环境里往往**已经继承了 `HTTP_PROXY`**，
 > 所以 AI 这边 git 能通不代表站主的终端能通。判断站主环境时要看
@@ -865,10 +871,18 @@ curl -s -o /dev/null -w "%{http_code}\n" --noproxy '*' https://reikaakane.com/bl
 > 加歌 / 换背景不在这里 —— 直接把 mp3 丢进 `public/audio/`、把图片丢进
 > `public/images/backgrounds/` 即可，无需任何配置（ADR-9）。
 
-1. 在 `content/blog/` 建 `my-post.mdx`（文件名即 URL）
-2. 写 frontmatter：`title` / `date` / `summary` / `category` / `tags` 必填，`cover` / `draft` / `slug` 可选（由 `src/lib/schema.ts` 的 zod 校验，写错构建期直接报错）
-3. 配图放 `public/images/blog/<slug>/`
-4. **如果正文里的代码块用了 `glsl` / `tsx` / `bash` 以外的语言，必须去 `src/lib/shiki.ts` 的 `LANGS` 数组里加上**（ADR-7）。不加不会报错，但那段代码没有配色，也没有告警
-5. 跑 `npm run build` 自查（frontmatter 校验、MDX 语法、公式语法都只在构建期报错）
-6. `git push origin main` 后 Cloudflare 自动构建上线，约 3 分钟
-7. 列表、目录、搜索索引、sitemap、相关文章全部自动更新
+1. 在 `content/blog/` 建 `my-post.md`（文件名即 URL）。站主一般用 Obsidian 从
+   `MioSrc/blogTemplate/模板.md` 新建，模板已预填占位值 + `draft: true`
+2. 写 frontmatter：`title` / `date` / `summary` / `category` 必填，`tags` / `cover` / `draft` / `slug`
+   可选（由 `src/lib/schema.ts` 的 zod 校验，写错或**留空**都会在构建期直接报错）
+3. 配图：新图走图床（Obsidian 的 cf-imageBed 插件直接传），本地图放 `public/images/blog/<slug>/`
+4. **`cover` 必须是纯地址**，不能是 `![alt](url)` 这种 Markdown 语法。
+   写错的话 dev 下整站 500、`build` 却能通过、线上图裂 + 分享卡片损坏（详见第 8 节图床小节）
+5. **外部图片域名必须在 `next.config.ts` 的 `images.remotePatterns` 里**，
+   否则 `/_next/image` 返回 400，而且构建期毫无征兆
+6. **如果正文里的代码块用了 `glsl` / `tsx` / `bash` 以外的语言，必须去 `src/lib/shiki.ts`
+   的 `LANGS` 数组里加上**（ADR-7）。不加不会报错，但那段代码没有配色，也没有告警
+7. 跑 `npm run build` 自查（frontmatter 校验、MDX 语法、公式语法都只在构建期报错）
+8. `git push origin main` 后 Cloudflare 自动构建上线，约 2~3 分钟
+9. 列表、目录、搜索索引、sitemap、相关文章全部自动更新
+10. **上线后打开文章确认图真的显示出来了** —— 第 4、5 条那两类问题构建期完全静默
