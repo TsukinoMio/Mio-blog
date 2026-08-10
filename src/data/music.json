@@ -29,6 +29,15 @@
       "src": "/audio/MILLIONSTARS%20-%20Rat%20A%20Tat!!!.mp3",
       "cover": "/images/covers/rat-a-tat.jpg",
       "duration": 266
+    },
+    {
+      "id": "track-4",
+      "title": "ともすれば、（中略）アイドル",
+      "artist": "灯里爱夏",
+      "album": "ともすれば、（中略）アイドル",
+      "src": "/audio/%E7%81%AF%E9%87%8C%E7%88%B1%E5%A4%8F%20-%20%E3%81%A8%E3%82%82%E3%81%99%E3%82%8C%E3%81%B0%E3%80%81%EF%BC%88%E4%B8%AD%E7%95%A5%EF%BC%89%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB.mp3",
+      "cover": "/images/covers/track-4.jpg",
+      "duration": 336
     }
   ]
 }

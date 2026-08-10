@@ -179,12 +179,12 @@ personalWeb/
 │                              （.md 与 .mdx 都收，posts.ts 的过滤是 /\.mdx?$/）
 ├── public/
 │   ├── _headers             ← Workers Assets 缓存头（/_next/static 一年 immutable，/images/* 与 /audio/* 30 天）
-│   ├── audio/*.mp3          ← 【丢文件即可】3 首，14.66 MB，128 kbps，**带内嵌封面**
+│   ├── audio/*.mp3          ← 【丢文件即可】4 首，19.94 MB，**自动压到 128 kbps**，带内嵌封面
 │   ├── images/avatar.jpg
 │   ├── images/my-icon.png   ← favicon（32×32），路径写在 siteConfig.icon
 │   ├── images/icon.svg      ← 项目自带的默认图标（当前未使用）
-│   ├── images/backgrounds/  ← 【丢文件即可】2 张，5.53 MB（含一张 4.86 MB 的 PNG，见 P2）
-│   ├── images/covers/       ← 3 张，由 sync-media 从 mp3 自动抽出，**不要手放**
+│   ├── images/backgrounds/  ← 【丢文件即可】4 张 WebP，3.25 MB，**自动转 WebP 且限宽 3840**
+│   ├── images/covers/       ← 4 张，由 sync-media 从 mp3 自动抽出，**不要手放**
 │   └── images/blog/<slug>/  ← 文章配图，14 张 2.56 MB，按 slug 分目录
 ├── scripts/sync-media.mjs   ← 【构建前自动跑】见 ADR-9
 └── src/
@@ -229,7 +229,7 @@ personalWeb/
 | `src/lib/toc.ts` | 从 MDX 抽标题生成目录，id 用 github-slugger 与 rehype-slug 对齐 | 见 ADR-5 |
 | `src/lib/shiki.ts` | **代码语言白名单**（当前 `glsl`/`tsx`/`bash`）+ 复刻输出结构的 transformer | 见 ADR-7 |
 | `src/lib/backgrounds.ts` | 背景图数据层，读生成的 `backgrounds.json` | 组件不直接 import JSON |
-| `scripts/sync-media.mjs` | 扫 `public/audio/` 与 `public/images/backgrounds/`，生成两份 JSON 并抽封面 | 见 ADR-9 |
+| `scripts/sync-media.mjs` | 扫 `public/audio/` 与 `public/images/backgrounds/`，**自动压缩音频 / 转 WebP**，生成两份 JSON 并抽封面 | 见 ADR-9 |
 | `wrangler.jsonc` | Worker 名字、入口、`ASSETS`/`IMAGES` 绑定 | 见 ADR-6 |
 | `open-next.config.ts` | `incrementalCache` —— **预渲染页面靠它才能被读到** | 见 ADR-8 |
 | `public/_headers` | Workers Assets 缓存头 | 见 P1 |
@@ -241,7 +241,7 @@ personalWeb/
 3. `src/config/copy.ts` —— 改界面文字
 4. `src/data/profile.json` —— 改自我介绍
 
-**换歌 / 换背景不改任何文件** —— 把 mp3 丢进 `public/audio/`、图片丢进 `public/images/backgrounds/` 即可。`src/data/music.json` 与 `src/data/backgrounds.json` 是**生成物，手改会在下次构建被覆盖**。
+**换歌 / 换背景不改任何文件** —— 把 mp3 丢进 `public/audio/`、图片丢进 `public/images/backgrounds/` 即可，**也不用先自己压缩**（脚本会压音频、转 WebP，原文件备份到 `MioSrc/media-originals/`）。`src/data/music.json` 与 `src/data/backgrounds.json` 是**生成物，手改会在下次构建被覆盖**。
 
 ---
 
@@ -530,11 +530,37 @@ Cloudflare Workers 免费版脚本上限 **3 MiB（gzip 后）**。`rehype-prett
 站主的要求是"丢文件进目录就行，不想改 config"：
 
 ```
-public/audio/*.mp3          -> src/data/music.json + public/images/covers/*
-public/images/backgrounds/* -> src/data/backgrounds.json
+public/audio/*.mp3          -> 压到 128k -> src/data/music.json + public/images/covers/*
+public/images/backgrounds/* -> 转 WebP  -> src/data/backgrounds.json
 ```
 
 由 `scripts/sync-media.mjs` 完成，挂在 `predev` / `prebuild` 上自动执行。歌曲的曲名 / 艺术家 / 专辑 / 时长 / 封面**全部来自 mp3 的 ID3 标签**。
+
+**2026-08-10 扩展：自动优化**（站主原话「我拖入音乐之前还要自己压缩，太麻烦」）
+
+| 输入 | 处理 |
+|---|---|
+| mp3 音频流 > 138k | 重编码到 128k，`-map 0 -c:v copy` 保留封面流与 ID3 |
+| png/jpg/bmp/tif 背景图 | 转 WebP（`libwebp`，quality 90），宽度上限 3840，只缩不放 |
+
+原文件挪到 **`MioSrc/media-originals/`**（在 `.gitignore` 里，不进仓库）。
+转码不可逆，直接覆盖等于销毁站主拖进来的原始素材，所以一律先备份再替换。
+
+**这套设计里有四个不显然的点，改动前务必读：**
+
+1. **判断码率必须用音频流的值，不能用容器的值。**
+   `music-metadata` 的 `format.bitrate` 给的正是音频流码率（实测三首 128k 的歌都读到 128）。
+   而容器码率被内嵌封面拉高了 —— 同样这三首用 ffprobe 读 `format.bit_rate` 是 133~144k。
+   拿容器值判断，会让**已经压好的文件每次构建都被重压一遍**，mp3 有损，音质会一次次掉。
+2. **阈值留了 8% 余量**（138k）而不是卡死 128。VBR 文件实测码率常在标称值上下浮动。
+3. **CI 里没有 ffmpeg**，检测不到就静默跳过，绝不能让构建失败 —— `prebuild` 在 Cloudflare 上也会跑。
+   代价是站主丢完文件若不在本地跑一次就提交，进仓库的是原文件。已写进《写作指南》。
+4. **图片转换前要检查同名 `.webp` 是否已存在**，存在就跳过并告警。
+   否则 `a.png` 转出来会覆盖掉一张不相干的 `a.webp`。
+
+**实测效果**：4 张背景 46.57 MB → 3.25 MB（省 93%）；新歌 320k/12.98 MB → 128k/5.28 MB。
+背景图源文件变小**不影响访客下载量**（访客拿的是 next/image 现场生成的 AVIF，
+实测这四张输出 38~177 KB），**省的是 git 仓库体积** —— 见 P2 里仓库体积那条。
 
 **为什么是构建前的独立脚本，而不是在 `src/lib/` 里读文件系统**（像 `posts.ts` 那样）：抽出来的封面必须**写进 `public/`**，而这要赶在 `next build` 收集静态资源**之前**完成。放进构建过程里做，写入时机与资源收集时机的先后没有保证。挂 `prebuild` 由 npm 保证顺序。
 
@@ -542,8 +568,9 @@ public/images/backgrounds/* -> src/data/backgrounds.json
 
 1. 两份 JSON 是**生成物**，手改会在下次构建被覆盖 —— 要改行为就改脚本
 2. 曲目 `id` 由 ID3 标题生成，**同时用作 React 列表 key 和封面文件名，必须唯一**。脚本里有撞车加 `-2` 后缀的逻辑，别删（实测踩过：复制一首同名歌进去，两条记录 id 相同，列表 key 重复且封面互相覆盖）
-3. **mp3 要保留内嵌封面**。曾为省体积用 ffmpeg 的 `-vn` 剥掉过，结果自动识别拿不到图。重转时要用 `-map 0 -c:v copy` 把封面流带上，代价是每首多 0.2~0.6 MB，这是这套工作流的必要成本
+3. **mp3 要保留内嵌封面**。曾为省体积用 ffmpeg 的 `-vn` 剥掉过，结果自动识别拿不到图。重转时要用 `-map 0 -c:v copy` 把封面流带上，代价是每首多 0.2~0.6 MB，这是这套工作流的必要成本（脚本里的自动压缩已经这么写了，别改成 `-vn`）
 4. `music-metadata` 虽在 devDependencies 但**参与构建**，不能当可选依赖删
+5. **自动优化必须是幂等的**。每次 `npm run dev` 都会跑一遍，不跳过已处理文件的话，音频会被反复有损转码
 
 ### ADR-10：背景图留本地静态，**不要挪去图床**（文章配图可以）
 
@@ -751,13 +778,12 @@ git 只认 `http.proxy` / `https.proxy` 配置或 `HTTP_PROXY` / `HTTPS_PROXY` �
 
 ### P2（可选打磨）
 
-1. **`lovelive.png` 是 4.86 MB 的 PNG**。照片类内容用 PNG 很浪费，转 WebP 能降到 1 MB 以内，`next/image` 的每一档也会跟着更小。ffmpeg 已就绪，随时可做。
-2. **音频首次加载仍需 14.66 MB**。已从 320 kbps 降到 128 kbps（35.12 → 13.64 MB），后因自动识别需要封面又带回 1.02 MB。Workers Assets **不支持 Range 请求**（实测发 `Range` 返回 200 全量而非 206），浏览器无法分段取。要再快只剩两条路：搬去支持 Range 的 CDN（`.env.example` 里的 `NEXT_PUBLIC_AUDIO_BASE_URL` 已为此预留），或把 `siteConfig.player.autoplayTrack` 从 `'random'` 改成固定第一首（常客只需缓存一首）。
-3. **点击目标偏小**（站主已表示不用修）：搜索关闭按钮 28×28、页脚社交链接 27×18、首页「ALL →」45×20，均低于 44×44 建议值。
-4. **`public/images/icon.svg` 当前未被引用**（`siteConfig.icon` 指向 `my-icon.png`），作为默认图标示例保留。
-5. **三处 `eslint-disable react-hooks/set-state-in-effect`**（`RandomBackgroundImage` / `PlayerProvider` / `ThemeProvider`）。都是「客户端专属状态恢复」的合理场景，注释里写明了原因。**属于合理取舍，不建议为消警告增加复杂度**。
-6. **搜索索引体积**随文章增长线性上升（**当前 1 篇 4932 字节**，此前 4 篇约 18 KB）。涨到几百篇时可考虑改成 `/api/search`（因保留了标准 Next.js 运行时，不用改部署方式）。
-7. **仓库体积**：git 永久保留了音频的历史 blob（320 kbps 那版 35 MB + 128 kbps 那版），以及那 3 篇已删文章的历史版本。以后换歌尽量一次选定码率再提交，别反复替换同名大文件。
+1. **音频首次加载 19.94 MB**（4 首）。单首都已是 128 kbps，压无可压。Workers Assets **不支持 Range 请求**（实测发 `Range` 返回 200 全量而非 206），浏览器无法分段取。要再快只剩两条路：搬去支持 Range 的 CDN（`.env.example` 里的 `NEXT_PUBLIC_AUDIO_BASE_URL` 已为此预留），或把 `siteConfig.player.autoplayTrack` 从 `'random'` 改成固定第一首（常客只需缓存一首）。**歌越加越多，这条会越来越明显。**
+2. **点击目标偏小**（站主已表示不用修）：搜索关闭按钮 28×28、页脚社交链接 27×18、首页「ALL →」45×20，均低于 44×44 建议值。
+3. **`public/images/icon.svg` 当前未被引用**（`siteConfig.icon` 指向 `my-icon.png`），作为默认图标示例保留。
+4. **三处 `eslint-disable react-hooks/set-state-in-effect`**（`RandomBackgroundImage` / `PlayerProvider` / `ThemeProvider`）。都是「客户端专属状态恢复」的合理场景，注释里写明了原因。**属于合理取舍，不建议为消警告增加复杂度**。
+5. **搜索索引体积**随文章增长线性上升（**当前 2 篇约 5 KB**）。涨到几百篇时可考虑改成 `/api/search`（因保留了标准 Next.js 运行时，不用改部署方式）。
+6. **仓库体积**：git 永久保留了音频的历史 blob（320 kbps 那版 35 MB + 128 kbps 那版），以及那 3 篇已删文章的历史版本。**2026-08-10 起自动优化能挡住新增量**（46.57 MB 的背景图在首次提交前就被压到 3.25 MB），但**历史里的旧 blob 清不掉，除非改写历史**。以后换歌换图直接丢进去就行，不要在同一批里反复替换同名大文件。
 
 ### 图床接入（2026-08-09 已启用）
 
